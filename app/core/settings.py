@@ -36,6 +36,6 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    DATA_FOLDER: str  = "/media/tinhanhnguyen/Data3/Projects/AIO_AIC/data/keyframe"
-    ID2INDEX_PATH: str = "/media/tinhanhnguyen/Data3/Projects/AIO_AIC/data/id2index.json"
+    DATA_FOLDER: str  = "/media/tinhanhnguyen/Data3/Projects/HCMAI2025_Baseline/data/keyframe"
+    ID2INDEX_PATH: str = "/media/tinhanhnguyen/Data3/Projects/HCMAI2025_Baseline/data/id2index.json"
     MODEL_NAME: str = "hf-hub:laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg-soup"

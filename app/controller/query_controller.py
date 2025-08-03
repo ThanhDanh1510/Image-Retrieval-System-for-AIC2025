@@ -79,9 +79,12 @@ class QueryController:
         
         exclude_ids = [
             int(k) for k, v in self.id2index.items()
-            if int(v.split('/')[0]) not in list_of_include_groups
-            and int(v.split('/')[1]) not in list_of_include_videos
+            if (
+                int(v.split('/')[0]) not in list_of_include_groups or
+                int(v.split('/')[1]) not in list_of_include_videos
+            )
         ]
+
 
 
         embedding = self.model_service.embedding(query).tolist()[0]
