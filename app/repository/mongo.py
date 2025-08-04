@@ -21,7 +21,6 @@ from schema.interface import KeyframeInterface
 
 
 class KeyframeRepository(MongoBaseRepository[Keyframe]):
-    
     async def get_keyframe_by_list_of_keys(
         self, keys: list[int]
     ):

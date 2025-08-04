@@ -73,17 +73,35 @@ class QueryController:
         query: str,
         top_k: int,
         score_threshold: float,
-        list_of_include_groups: list[int],
-        list_of_include_videos: list[int]
-    ):
+        list_of_include_groups: list[int]  ,
+        list_of_include_videos: list[int]  
+    ):     
         
-        exclude_ids = [
-            int(k) for k, v in self.id2index.items()
-            if (
-                int(v.split('/')[0]) not in list_of_include_groups or
-                int(v.split('/')[1]) not in list_of_include_videos
-            )
-        ]
+
+        exclude_ids = None
+        if len(list_of_include_groups) > 0   and len(list_of_include_videos) == 0:
+            print("hi")
+            exclude_ids = [
+                int(k) for k, v in self.id2index.items()
+                if int(v.split('/')[0]) not in list_of_include_groups
+            ]
+        
+        elif len(list_of_include_groups) == 0   and len(list_of_include_videos) >0 :
+            exclude_ids = [
+                int(k) for k, v in self.id2index.items()
+                if int(v.split('/')[1]) not in list_of_include_videos
+            ]
+
+        elif len(list_of_include_groups) == 0  and len(list_of_include_videos) == 0 :
+            exclude_ids = []
+        else:
+            exclude_ids = [
+                int(k) for k, v in self.id2index.items()
+                if (
+                    int(v.split('/')[0]) not in list_of_include_groups or
+                    int(v.split('/')[1]) not in list_of_include_videos
+                )
+            ]
 
 
 
