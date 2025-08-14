@@ -57,10 +57,7 @@ async def search_keyframes(
     request: TextSearchRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """
-    Search for keyframes using text query with semantic similarity.
-    """
-    
+    """Search for keyframes using text query with semantic similarity."""
     logger.info(f"Text search request: query='{request.query}', top_k={request.top_k}, threshold={request.score_threshold}")
     
     results = await controller.search_text(
@@ -70,12 +67,16 @@ async def search_keyframes(
     )
     
     logger.info(f"Found {len(results)} results for query: '{request.query}'")
-    display_results = list(
-        map(
-            lambda pair: SingleKeyframeDisplay(path=pair[0], score=pair[1]),
-            map(controller.convert_model_to_path, results)
-        )
-    )
+    
+    # 🔹 Fix: Sử dụng convert_model_to_path đúng cách
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"]
+        ))
+    
     return KeyframeDisplay(results=display_results)
 
     
@@ -119,33 +120,28 @@ async def search_keyframes_exclude_groups(
     request: TextSearchWithExcludeGroupsRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """
-    Search for keyframes with group exclusion filtering.
-    """
-
+    """Search for keyframes with group exclusion filtering."""
     logger.info(f"Text search with group exclusion: query='{request.query}', exclude_groups={request.exclude_groups}")
     
-    results: list[KeyframeServiceReponse] = await controller.search_text_with_exlude_group(
+    results = await controller.search_text_with_exclude_group(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
-        list_group_exlude=request.exclude_groups
+        list_group_exclude=request.exclude_groups
     )
     
-    logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")\
+    logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")
     
+    # 🔹 Fix: Xử lý từng result riêng lẻ
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"]
+        ))
     
-
-    display_results = list(
-        map(
-            lambda pair: SingleKeyframeDisplay(path=pair[0], score=pair[1]),
-            map(controller.convert_model_to_path, results)
-        )
-    )
     return KeyframeDisplay(results=display_results)
-
-
-
 
 
 
@@ -193,10 +189,7 @@ async def search_keyframes_selected_groups_videos(
     request: TextSearchWithSelectedGroupsAndVideosRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """
-    Search for keyframes within selected groups and videos.
-    """
-
+    """Search for keyframes within selected groups and videos."""
     logger.info(f"Text search with selection: query='{request.query}', include_groups={request.include_groups}, include_videos={request.include_videos}")
     
     results = await controller.search_with_selected_video_group(
@@ -208,15 +201,15 @@ async def search_keyframes_selected_groups_videos(
     )
     
     logger.info(f"Found {len(results)} results within selected groups/videos")
-
-    display_results = list(
-        map(
-            lambda pair: SingleKeyframeDisplay(path=pair[0], score=pair[1]),
-            map(controller.convert_model_to_path, results)
-        )
-    )
-    return KeyframeDisplay(results=display_results)
-
     
-
+    # 🔹 Fix: Xử lý từng result riêng lẻ
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"]
+        ))
+    
+    return KeyframeDisplay(results=display_results)
 

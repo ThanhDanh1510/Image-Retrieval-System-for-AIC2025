@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   etcd:
@@ -63,7 +63,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
       start_period: 90s
-      timeout: 20s
+      timeout: 120s
       retries: 3
     depends_on:
       - etcd
@@ -79,6 +79,21 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: example
     ports:
       - "27017:27017"
+    healthcheck:
+      test: |
+        mongosh --eval "
+          try {
+            db.runCommand('ping').ok;
+            print('MongoDB is healthy');
+          } catch (e) {
+            print('MongoDB health check failed:', e);
+            exit(1);
+          }
+        " --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     volumes:
       - mongodb_data:/data/db
 

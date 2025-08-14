@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-
 
 from router import keyframe_api
 from core.lifespan import lifespan
@@ -13,7 +15,18 @@ from core.logger import SimpleLogger
 
 logger = SimpleLogger(__name__)
 
+IMAGES_DIR = os.getenv("IMAGES_DIR", "C:/Users/ADMIN/Downloads/archive")
 
+# 🔹 Custom middleware để thêm CORS headers cho static files
+class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/images"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+    
 app = FastAPI(
     title="Keyframe Search API",
     description="""
@@ -46,7 +59,7 @@ app = FastAPI(
 
     ### Getting Started
 
-    Try the simple search endpoint `/keyframe/search` with a natural language query
+    Try the simple search endpoint `/api/v1/keyframe/search` with a natural language query
     like "person walking in park" or "sunset over mountains".
     """,
     version="1.0.0",
@@ -61,7 +74,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-#
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -70,9 +83,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(CORSStaticFilesMiddleware)
+# Include API routes
 app.include_router(keyframe_api.router, prefix="/api/v1")
 
+# 🔹 Mount static files với error handling
+try:
+    if os.path.exists(IMAGES_DIR):
+        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+        logger.info(f"Mounted static files from: {IMAGES_DIR}")
+    else:
+        logger.error(f"Images directory not found: {IMAGES_DIR}")
+except Exception as e:
+    logger.error(f"Failed to mount static files: {e}")
 
+# 🔹 Fix: Thêm decorator cho root endpoint
 @app.get("/", tags=["root"])
 async def root():
     """
@@ -82,10 +107,13 @@ async def root():
         "message": "Keyframe Search API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/api/v1/keyframe/health",
-        "search": "/api/v1/keyframe/search"
+        "redoc": "/redoc",
+        "health": "/health",
+        "api_health": "/api/v1/keyframe/health",
+        "search_endpoint": "/api/v1/keyframe/search",
+        "images_endpoint": "/images",
+        "status": "running"
     }
-
 
 @app.get("/health", tags=["health"])
 async def health():
@@ -94,39 +122,47 @@ async def health():
     """
     return {
         "status": "healthy",
-        "service": "keyframe-search-api"
+        "service": "keyframe-search-api",
+        "images_dir": IMAGES_DIR,
+        "images_mounted": os.path.exists(IMAGES_DIR)
     }
 
+# 🔹 Enable exception handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """
+    Global exception handler for unhandled errors.
+    """
+    logger.error(f"Unhandled exception on {request.url}: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error occurred",
+            "error_type": type(exc).__name__,
+            "path": str(request.url)
+        }
+    )
 
-# @app.exception_handler(Exception)
-# async def global_exception_handler(request, exc):
-#     """
-#     Global exception handler for unhandled errors.
-#     """
-#     logger.error(f"Unhandled exception: {str(exc)}")
-#     return JSONResponse(
-#         status_code=500,
-#         content={
-#             "detail": "Internal server error occurred",
-#             "error_type": type(exc).__name__
-#         }
-#     )
-
-
-# @app.exception_handler(HTTPException)
-# async def http_exception_handler(request, exc):
-#     """
-#     Handler for HTTP exceptions.
-#     """
-#     logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
-#     return JSONResponse(
-#         status_code=exc.status_code,
-#         content={"detail": exc.detail}
-#     )
-
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """
+    Handler for HTTP exceptions.
+    """
+    logger.warning(f"HTTP exception on {request.url}: {exc.status_code} - {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "path": str(request.url)
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # 🔹 Thêm startup message
+    logger.info("Starting Keyframe Search API...")
+    logger.info(f"Images directory: {IMAGES_DIR}")
     
     uvicorn.run(
         "main:app",

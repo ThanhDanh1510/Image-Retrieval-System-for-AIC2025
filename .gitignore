@@ -134,6 +134,24 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Node.js / React
+node_modules/
+build/
+dist/
+.cache/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-lock.yaml
+
+# Tailwind JIT cache
+.tailwindcss-cache/
+
 # Environments
 .env
 .envrc

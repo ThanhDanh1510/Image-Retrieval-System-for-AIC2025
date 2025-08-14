@@ -14,12 +14,12 @@ class TextSearchRequest(BaseSearchRequest):
     pass
 
 
-class TextSearchWithExcludeGroupsRequest(BaseSearchRequest):
-    """Text search request with group exclusion"""
-    exclude_groups: List[int] = Field(
-        default_factory=list,
-        description="List of group IDs to exclude from search results",
-    )
+    class TextSearchWithExcludeGroupsRequest(BaseSearchRequest):
+        """Text search request with group exclusion"""
+        exclude_groups: List[int] = Field(
+            default_factory=list,
+            description="List of group IDs to exclude from search results",
+        )
 
 
 class TextSearchWithSelectedGroupsAndVideosRequest(BaseSearchRequest):
