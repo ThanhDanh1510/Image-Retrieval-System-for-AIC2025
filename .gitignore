@@ -55,6 +55,12 @@ cover/
 *.mo
 *.pot
 
+# Dataset
+data/images/
+*.webp
+*.jpg
+*.png
+
 # Django stuff:
 *.log
 local_settings.py

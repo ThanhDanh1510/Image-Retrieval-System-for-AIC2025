@@ -13,6 +13,7 @@ sys.path.insert(0, ROOT_DIR)
 
 from service import ModelService, KeyframeQueryService
 from schema.response import KeyframeServiceReponse
+from config import DATA_FOLDER_PATH, API_BASE_URL
 
 class QueryController:
     
@@ -24,11 +25,11 @@ class QueryController:
         keyframe_service: KeyframeQueryService,
         base_url: str = "http://localhost:8000"
     ):
-        self.data_folder = Path("C:/Users/ADMIN/Downloads/archive")
+        self.data_folder = DATA_FOLDER_PATH
         self.id2index = json.load(open(id2index_path, 'r'))
         self.model_service = model_service
         self.keyframe_service = keyframe_service
-        self.base_url = base_url.rstrip('/')
+        self.base_url = API_BASE_URL
     
     def convert_model_to_path(
         self,
