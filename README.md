@@ -1,21 +1,38 @@
-# HCMAI2025_Baseline
+# Image Retrieval System for AIC2025
 
-A FastAPI-based AI application powered by Milvus for vector search, MongoDB for metadata storage, and MinIO for object storage.
+A full-stack AI application for image retrieval in the AIC2025 Challenge.  
 
-## 🧑‍💻 Getting Started
+**Tech stack:**
+- **Frontend:** React + TailwindCSS
+- **Backend:** FastAPI + Milvus + MongoDB + MinIO
+- **Vector Search:** Milvus
+- **Metadata Storage:** MongoDB
+- **Object Storage:** MinIO
 
-### Prerequisites
+---
+
+## 🗂️ Architecture
+```mermaid
+flowchart LR
+    User[User] -->|Query| Frontend[React + Tailwind]
+    Frontend -->|API Calls| Backend[FastAPI]
+    Backend --> Milvus
+    Backend --> MongoDB
+    Backend --> MinIO
+````
+
+---
+
+## 📦 Prerequisites
+
 - Docker
 - Docker Compose
 - Python 3.10
 - uv
+- Conda (optional)
+- CUDA (GPU version, not CPU)
 
-### Download the dataset
-1. [Embedding data and keys](https://www.kaggle.com/datasets/anhnguynnhtinh/embedding-data)
-2. [Keyframes](https://www.kaggle.com/datasets/anhnguynnhtinh/aic-keyframe-batch-one)
-
-
-Convert the global2imgpath.json to this following format(id2index.json)
+Convert the global2imgpath.json to this following format (id2index.json)
 ```json
 {
   "0": "1/1/0",
@@ -24,58 +41,101 @@ Convert the global2imgpath.json to this following format(id2index.json)
   "3": "1/1/169",
   "4": "1/1/428",
   "5": "1/1/447",
-  "6": "1/1/466",
-  "7": "1/1/467",
 }
 ```
 
-
-### 🔧 Local Development
-1. Clone the repo and start all services:
-```bash
-git clone https://github.com/yourusername/aio-aic.git
-cd aio-aic
+Dataset directory structure:
+```
+data/
+├── L01/
+│   ├── V001/
+│   │   ├── 00000001.webp
+│   │   └── ...
+│   └── V002/
+└── L02/
+    └── ...
 ```
 
-2. Install uv and setup env
+---
+
+## ⚙️ Environment Setup
+
+### 1️⃣ Clone repository
+
 ```bash
+git clone https://github.com/ThanhDanh1510/Image-Retrieval-System-for-AIC2025.git
+cd Image-Retrieval-System-for-AIC2025
+```
+
+### 2️⃣ Setup `.env`
+
+Copy example file:
+
+```bash
+cp .env.example .env
+```
+
+### 3️⃣ Install frontend dependencies
+
+```bash
+cd gui
+npm install
+```
+
+### 4️⃣ Setup backend environment
+
+```bash
+cd ..
 pip install uv
 uv init --python=3.10
 uv add aiofiles beanie dotenv fastapi[standard] httpx ipykernel motor nicegui numpy open-clip-torch pydantic-settings pymilvus streamlit torch typing-extensions usearch uvicorn
-```
-
-3. Activate .venv
-```bash
 source .venv/bin/activate
 ```
-4. Run docker compose
+
+### 5️⃣ Start services
+
 ```bash
 docker compose up -d
 ```
 
-4. Data Migration 
+### 6️⃣ Data migration
+
 ```bash
-python migration/embedding_migration.py --file_path <emnedding.pt file>
-python migration/keyframe_migration.py --file_path <id2index.json file path>
+python migration/embedding_migration.py --file_path <embedding.pt>
+python migration/keyframe_migration.py --file_path <id2index.json>
 ```
 
-5. Run the application
+---
 
-Open 2 tabs
+## 🚀 Run Application
 
-5.1. Run the FastAPI application
-```bash
-cd gui
-streamlit run main.py
-```
+* **Backend (FastAPI)**:
 
-5.1. Run the Streamlit application
 ```bash
 cd app
 python main.py
 ```
 
+* **Frontend (React + TailwindCSS)**:
 
+```bash
+cd gui
+npm start
+```
 
- 
+---
 
+## 📁 Project Structure
+
+```
+.
+├── app/                # Backend code
+├── gui/                # Frontend code
+├── data/               # Dataset (ignored in git)
+├── migration/          # Data migration scripts
+├── config.py           # Global config
+├── .env.example        # Environment template
+├── docker-compose.yml
+├── README.md
+└── .gitignore
+```
