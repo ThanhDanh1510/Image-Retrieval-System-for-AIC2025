@@ -15,7 +15,10 @@ from core.logger import SimpleLogger
 
 logger = SimpleLogger(__name__)
 
-IMAGES_DIR = os.getenv("IMAGES_DIR", "C:/Users/ADMIN/Downloads/archive")
+IMAGES_DIR = os.getenv("IMAGES_DIR", 
+    os.path.join(os.path.dirname(__file__), "..", "images"))
+
+
 
 # 🔹 Custom middleware để thêm CORS headers cho static files
 class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
@@ -89,11 +92,23 @@ app.include_router(keyframe_api.router, prefix="/api/v1")
 
 # 🔹 Mount static files với error handling
 try:
-    if os.path.exists(IMAGES_DIR):
-        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
-        logger.info(f"Mounted static files from: {IMAGES_DIR}")
+    abs_images_dir = os.path.abspath(IMAGES_DIR)
+    if os.path.exists(abs_images_dir):
+        app.mount("/images", StaticFiles(directory=abs_images_dir), name="images")
+        logger.info(f"Mounted static files from: {abs_images_dir}")
     else:
-        logger.error(f"Images directory not found: {IMAGES_DIR}")
+        logger.error(f"Images directory not found: {abs_images_dir}")
+        # Tìm kiếm trong các vị trí có thể
+        possible_paths = [
+            "../images",
+            "../../images", 
+            "./images",
+            os.path.join(os.path.dirname(__file__), "..", "images")
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                logger.info(f"Found images directory at: {os.path.abspath(path)}")
+                break
 except Exception as e:
     logger.error(f"Failed to mount static files: {e}")
 
@@ -156,6 +171,58 @@ async def http_exception_handler(request, exc):
             "path": str(request.url)
         }
     )
+
+@app.get("/debug/paths", tags=["debug"])
+async def debug_paths():
+    """Debug endpoint để kiểm tra đường dẫn"""
+    return {
+        "cwd": os.getcwd(),
+        "script_dir": os.path.dirname(__file__),
+        "images_dir": IMAGES_DIR,
+        "images_exists": os.path.exists(IMAGES_DIR),
+        "is_directory": os.path.isdir(IMAGES_DIR) if os.path.exists(IMAGES_DIR) else False,
+        "absolute_images_path": os.path.abspath(IMAGES_DIR)
+    }
+
+@app.get("/debug/mount-status", tags=["debug"])
+async def mount_status():
+    """Kiểm tra trạng thái mount và sample file"""
+    sample_path = "L06/V013/00015158.webp"
+    full_path = os.path.join(IMAGES_DIR, sample_path)
+    
+    return {
+        "images_dir": IMAGES_DIR,
+        "images_dir_exists": os.path.exists(IMAGES_DIR),
+        "sample_file_path": full_path,
+        "sample_file_exists": os.path.exists(full_path),
+        "is_file": os.path.isfile(full_path) if os.path.exists(full_path) else False,
+        "file_size": os.path.getsize(full_path) if os.path.exists(full_path) else None,
+        "app_routes": [str(route) for route in app.routes],
+        "mounted_apps": [str(route) for route in app.routes if hasattr(route, 'app')]
+    }
+
+@app.get("/debug/file-permissions/{path:path}", tags=["debug"])
+async def check_file_permissions(path: str):
+    """Kiểm tra quyền truy cập file"""
+    full_path = os.path.join(IMAGES_DIR, path)
+    result = {
+        "requested_path": path,
+        "full_path": full_path,
+        "exists": os.path.exists(full_path)
+    }
+    
+    if os.path.exists(full_path):
+        try:
+            # Thử đọc file
+            with open(full_path, 'rb') as f:
+                f.read(100)  # Đọc 100 bytes đầu
+            result["readable"] = True
+        except Exception as e:
+            result["readable"] = False
+            result["read_error"] = str(e)
+    
+    return result
+
 
 if __name__ == "__main__":
     import uvicorn
