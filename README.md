@@ -46,7 +46,7 @@ Convert the global2imgpath.json to this following format (id2index.json)
 
 Dataset directory structure:
 ```
-data/
+images/
 ├── L01/
 │   ├── V001/
 │   │   ├── 00000001.webp
@@ -131,7 +131,7 @@ npm start
 .
 ├── app/                # Backend code
 ├── gui/                # Frontend code
-├── data/               # Dataset (ignored in git)
+├── images/               # Dataset (ignored in git)
 ├── migration/          # Data migration scripts
 ├── config.py           # Global config
 ├── .env.example        # Environment template
