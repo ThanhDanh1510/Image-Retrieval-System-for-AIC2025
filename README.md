@@ -133,7 +133,6 @@ npm start
 ├── gui/                # Frontend code
 ├── images/               # Dataset (ignored in git)
 ├── migration/          # Data migration scripts
-├── config.py           # Global config
 ├── .env.example        # Environment template
 ├── docker-compose.yml
 ├── README.md

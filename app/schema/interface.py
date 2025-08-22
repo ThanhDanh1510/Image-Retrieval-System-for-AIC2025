@@ -8,8 +8,6 @@ class KeyframeInterface(BaseModel):
     keyframe_num: int = Field(..., description="Keyframe number")
 
 
-
-
 class MilvusSearchRequest(BaseModel):
     embedding: List[float] = Field(..., description="Query embedding vector")
     top_k: int = Field(default=10, ge=1, le=1000, description="Number of top results to return")
