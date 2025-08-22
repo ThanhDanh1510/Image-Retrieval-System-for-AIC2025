@@ -4,10 +4,9 @@ A full-stack AI application for image retrieval in the AIC2025 Challenge.
 
 **Tech stack:**
 - **Frontend:** React + TailwindCSS
-- **Backend:** FastAPI + Milvus + MongoDB + MinIO
+- **Backend:** FastAPI + Milvus + MongoDB
 - **Vector Search:** Milvus
 - **Metadata Storage:** MongoDB
-- **Object Storage:** MinIO
 
 ---
 
@@ -18,7 +17,6 @@ flowchart LR
     Frontend -->|API Calls| Backend[FastAPI]
     Backend --> Milvus
     Backend --> MongoDB
-    Backend --> MinIO
 ````
 
 ---
