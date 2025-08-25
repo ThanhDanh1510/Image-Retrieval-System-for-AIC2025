@@ -84,14 +84,12 @@ class MilvusEmbeddingInjector:
         batch_size: int = 10000,
     ):
         print(f"Loading embeddings from {embedding_file_path}")
-        embeddings = torch.load(embedding_file_path, map_location=torch.device('cpu'), weights_only=False)
-
+        embeddings_dict = torch.load(embedding_file_path, map_location="cpu")
+        # keys là dạng chuỗi số, sort tăng dần để không bị lộn thứ tự
+        keys = sorted(embeddings_dict.keys(), key=lambda x: int(x))
+        embeddings_list = [embeddings_dict[k].cpu().numpy() for k in keys]
+        embeddings = np.stack(embeddings_list)
         
-        if isinstance(embeddings, torch.Tensor):
-            embeddings = embeddings.cpu().numpy()
-        
-        if embeddings.ndim == 1:
-            embeddings = embeddings.reshape(1, -1)
         
         num_vectors, embedding_dim = embeddings.shape
         print(f"Loaded {num_vectors} embeddings with dimension {embedding_dim}")

@@ -29,11 +29,30 @@ class KeyframeQueryService:
     async def _retrieve_keyframes(self, ids: list[int]):
         keyframes = await self.keyframe_mongo_repo.get_keyframe_by_list_of_keys(ids)
 
-  
         keyframe_map = {k.key: k for k in keyframes}
-        return_keyframe = [
-            keyframe_map[k] for k in ids
-        ]   
+
+        print("Type of ids:", [type(k) for k in ids])
+        print("Type of keyframe_map keys:", [type(k) for k in keyframe_map.keys()])
+
+        if len(keyframe_map) > 0:
+            sample_key = next(iter(keyframe_map.keys()))
+            if isinstance(sample_key, str):
+                ids = list(map(str, ids))
+            elif isinstance(sample_key, int):
+                ids = list(map(int, ids))
+
+        # Tránh lỗi key không tồn tại bằng cách thêm kiểm tra tồn tại key
+        return_keyframe = []
+        missing_keys = []
+        for k in ids:
+            if k in keyframe_map:
+                return_keyframe.append(keyframe_map[k])
+            else:
+                missing_keys.append(k)
+
+        if missing_keys:
+            print(f"Warning: Missing keys in keyframe_map: {missing_keys}")
+
         return return_keyframe
 
     async def _search_keyframes(

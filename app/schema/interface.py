@@ -4,7 +4,7 @@ from typing import List, Optional
 class KeyframeInterface(BaseModel):
     key: int = Field(..., description="Keyframe key")
     video_num: int = Field(..., description="Video ID")
-    group_num: int = Field(..., description="Group ID")
+    group_num: str = Field(..., description="Group ID")
     keyframe_num: int = Field(..., description="Keyframe number")
 
 

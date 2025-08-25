@@ -1,8 +1,10 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
+
 load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # từ core → app → project_root
 
 
 class MongoDBSettings(BaseSettings):
@@ -37,8 +39,6 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    BASE_DIR = Path(__file__).resolve().parent.parent  # từ core → app → project_root
-
-    DATA_FOLDER = BASE_DIR / "images"
-    ID2INDEX_PATH: str = BASE_DIR / "id2index.json"
-    MODEL_NAME: str = "hf-hub:laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg-soup"
+    DATA_FOLDER: str = str(BASE_DIR / "images")
+    ID2INDEX_PATH: str = str(BASE_DIR / "id2index.json")
+    MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"

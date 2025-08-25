@@ -43,7 +43,7 @@ def transform_data(data: dict[str,str]) -> list[Keyframe]:
         keyframe_obj = Keyframe(
             key=int(key),
             video_num=int(video),
-            group_num=int(group),
+            group_num=str(group),
             keyframe_num=int(keyframe)
         )
         keyframes.append(keyframe_obj)
