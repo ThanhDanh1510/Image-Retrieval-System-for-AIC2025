@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from dotenv import load_dotenv
+from pathlib import Path
 load_dotenv()
 
 
@@ -36,6 +37,8 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    DATA_FOLDER: str  = "/media/tinhanhnguyen/Data3/Projects/HCMAI2025_Baseline/data/keyframe"
-    ID2INDEX_PATH: str = "/media/tinhanhnguyen/Data3/Projects/HCMAI2025_Baseline/data/id2index.json"
+    BASE_DIR = Path(__file__).resolve().parent.parent  # từ core → app → project_root
+
+    DATA_FOLDER = BASE_DIR / "images"
+    ID2INDEX_PATH: str = BASE_DIR / "id2index.json"
     MODEL_NAME: str = "hf-hub:laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg-soup"

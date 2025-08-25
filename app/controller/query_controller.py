@@ -38,7 +38,7 @@ class QueryController:
         """Convert KeyframeServiceReponse object thành path và score"""
         path = os.path.join(
             self.data_folder, 
-            f"L{model.group_num:02d}/V{model.video_num:03d}/{model.keyframe_num:08d}.webp"
+            f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num:08d}.webp"
         )
         return path, model.confidence_score
     
@@ -50,7 +50,7 @@ class QueryController:
     def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
         """Convert KeyframeServiceReponse thành format cho frontend"""
         # Tạo relative path
-        relative_path = f"L{model.group_num:02d}/V{model.video_num:03d}/{model.keyframe_num:08d}.webp"
+        relative_path = f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num:08d}.webp"
         
         return {
             "path": self.get_image_url(relative_path),

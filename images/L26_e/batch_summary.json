@@ -1,0 +1,650 @@
+{
+  "L26_V428.mp4": {
+    "video_name": "L26_V428.mp4",
+    "total_scenes": 122,
+    "original_keyframes": 732,
+    "filtered_keyframes": 131,
+    "saved_files": 131,
+    "output_folder": "V428",
+    "status": "success"
+  },
+  "L26_V429.mp4": {
+    "video_name": "L26_V429.mp4",
+    "total_scenes": 115,
+    "original_keyframes": 690,
+    "filtered_keyframes": 124,
+    "saved_files": 124,
+    "output_folder": "V429",
+    "status": "success"
+  },
+  "L26_V430.mp4": {
+    "video_name": "L26_V430.mp4",
+    "total_scenes": 108,
+    "original_keyframes": 648,
+    "filtered_keyframes": 116,
+    "saved_files": 116,
+    "output_folder": "V430",
+    "status": "success"
+  },
+  "L26_V431.mp4": {
+    "video_name": "L26_V431.mp4",
+    "total_scenes": 111,
+    "original_keyframes": 666,
+    "filtered_keyframes": 124,
+    "saved_files": 124,
+    "output_folder": "V431",
+    "status": "success"
+  },
+  "L26_V432.mp4": {
+    "video_name": "L26_V432.mp4",
+    "total_scenes": 112,
+    "original_keyframes": 672,
+    "filtered_keyframes": 119,
+    "saved_files": 119,
+    "output_folder": "V432",
+    "status": "success"
+  },
+  "L26_V433.mp4": {
+    "video_name": "L26_V433.mp4",
+    "total_scenes": 125,
+    "original_keyframes": 750,
+    "filtered_keyframes": 135,
+    "saved_files": 135,
+    "output_folder": "V433",
+    "status": "success"
+  },
+  "L26_V434.mp4": {
+    "video_name": "L26_V434.mp4",
+    "total_scenes": 113,
+    "original_keyframes": 678,
+    "filtered_keyframes": 119,
+    "saved_files": 119,
+    "output_folder": "V434",
+    "status": "success"
+  },
+  "L26_V435.mp4": {
+    "video_name": "L26_V435.mp4",
+    "total_scenes": 128,
+    "original_keyframes": 768,
+    "filtered_keyframes": 137,
+    "saved_files": 137,
+    "output_folder": "V435",
+    "status": "success"
+  },
+  "L26_V436.mp4": {
+    "video_name": "L26_V436.mp4",
+    "total_scenes": 101,
+    "original_keyframes": 606,
+    "filtered_keyframes": 110,
+    "saved_files": 110,
+    "output_folder": "V436",
+    "status": "success"
+  },
+  "L26_V437.mp4": {
+    "video_name": "L26_V437.mp4",
+    "total_scenes": 118,
+    "original_keyframes": 708,
+    "filtered_keyframes": 127,
+    "saved_files": 127,
+    "output_folder": "V437",
+    "status": "success"
+  },
+  "L26_V438.mp4": {
+    "video_name": "L26_V438.mp4",
+    "total_scenes": 100,
+    "original_keyframes": 600,
+    "filtered_keyframes": 108,
+    "saved_files": 108,
+    "output_folder": "V438",
+    "status": "success"
+  },
+  "L26_V439.mp4": {
+    "video_name": "L26_V439.mp4",
+    "total_scenes": 98,
+    "original_keyframes": 588,
+    "filtered_keyframes": 104,
+    "saved_files": 104,
+    "output_folder": "V439",
+    "status": "success"
+  },
+  "L26_V440.mp4": {
+    "video_name": "L26_V440.mp4",
+    "total_scenes": 118,
+    "original_keyframes": 708,
+    "filtered_keyframes": 127,
+    "saved_files": 127,
+    "output_folder": "V440",
+    "status": "success"
+  },
+  "L26_V441.mp4": {
+    "video_name": "L26_V441.mp4",
+    "total_scenes": 114,
+    "original_keyframes": 684,
+    "filtered_keyframes": 120,
+    "saved_files": 120,
+    "output_folder": "V441",
+    "status": "success"
+  },
+  "L26_V442.mp4": {
+    "video_name": "L26_V442.mp4",
+    "total_scenes": 106,
+    "original_keyframes": 636,
+    "filtered_keyframes": 113,
+    "saved_files": 113,
+    "output_folder": "V442",
+    "status": "success"
+  },
+  "L26_V443.mp4": {
+    "video_name": "L26_V443.mp4",
+    "total_scenes": 119,
+    "original_keyframes": 714,
+    "filtered_keyframes": 128,
+    "saved_files": 128,
+    "output_folder": "V443",
+    "status": "success"
+  },
+  "L26_V444.mp4": {
+    "video_name": "L26_V444.mp4",
+    "total_scenes": 89,
+    "original_keyframes": 534,
+    "filtered_keyframes": 98,
+    "saved_files": 98,
+    "output_folder": "V444",
+    "status": "success"
+  },
+  "L26_V445.mp4": {
+    "video_name": "L26_V445.mp4",
+    "total_scenes": 100,
+    "original_keyframes": 600,
+    "filtered_keyframes": 110,
+    "saved_files": 110,
+    "output_folder": "V445",
+    "status": "success"
+  },
+  "L26_V446.mp4": {
+    "video_name": "L26_V446.mp4",
+    "total_scenes": 101,
+    "original_keyframes": 606,
+    "filtered_keyframes": 109,
+    "saved_files": 109,
+    "output_folder": "V446",
+    "status": "success"
+  },
+  "L26_V447.mp4": {
+    "video_name": "L26_V447.mp4",
+    "total_scenes": 102,
+    "original_keyframes": 612,
+    "filtered_keyframes": 109,
+    "saved_files": 109,
+    "output_folder": "V447",
+    "status": "success"
+  },
+  "L26_V448.mp4": {
+    "video_name": "L26_V448.mp4",
+    "total_scenes": 113,
+    "original_keyframes": 678,
+    "filtered_keyframes": 123,
+    "saved_files": 123,
+    "output_folder": "V448",
+    "status": "success"
+  },
+  "L26_V449.mp4": {
+    "video_name": "L26_V449.mp4",
+    "total_scenes": 102,
+    "original_keyframes": 612,
+    "filtered_keyframes": 113,
+    "saved_files": 113,
+    "output_folder": "V449",
+    "status": "success"
+  },
+  "L26_V450.mp4": {
+    "video_name": "L26_V450.mp4",
+    "total_scenes": 117,
+    "original_keyframes": 702,
+    "filtered_keyframes": 124,
+    "saved_files": 124,
+    "output_folder": "V450",
+    "status": "success"
+  },
+  "L26_V451.mp4": {
+    "video_name": "L26_V451.mp4",
+    "total_scenes": 93,
+    "original_keyframes": 558,
+    "filtered_keyframes": 101,
+    "saved_files": 101,
+    "output_folder": "V451",
+    "status": "success"
+  },
+  "L26_V452.mp4": {
+    "video_name": "L26_V452.mp4",
+    "total_scenes": 98,
+    "original_keyframes": 588,
+    "filtered_keyframes": 108,
+    "saved_files": 108,
+    "output_folder": "V452",
+    "status": "success"
+  },
+  "L26_V453.mp4": {
+    "video_name": "L26_V453.mp4",
+    "total_scenes": 110,
+    "original_keyframes": 660,
+    "filtered_keyframes": 117,
+    "saved_files": 117,
+    "output_folder": "V453",
+    "status": "success"
+  },
+  "L26_V454.mp4": {
+    "video_name": "L26_V454.mp4",
+    "total_scenes": 93,
+    "original_keyframes": 558,
+    "filtered_keyframes": 101,
+    "saved_files": 101,
+    "output_folder": "V454",
+    "status": "success"
+  },
+  "L26_V455.mp4": {
+    "video_name": "L26_V455.mp4",
+    "total_scenes": 107,
+    "original_keyframes": 642,
+    "filtered_keyframes": 116,
+    "saved_files": 116,
+    "output_folder": "V455",
+    "status": "success"
+  },
+  "L26_V456.mp4": {
+    "video_name": "L26_V456.mp4",
+    "total_scenes": 107,
+    "original_keyframes": 642,
+    "filtered_keyframes": 114,
+    "saved_files": 114,
+    "output_folder": "V456",
+    "status": "success"
+  },
+  "L26_V457.mp4": {
+    "video_name": "L26_V457.mp4",
+    "total_scenes": 96,
+    "original_keyframes": 576,
+    "filtered_keyframes": 103,
+    "saved_files": 103,
+    "output_folder": "V457",
+    "status": "success"
+  },
+  "L26_V458.mp4": {
+    "video_name": "L26_V458.mp4",
+    "total_scenes": 98,
+    "original_keyframes": 588,
+    "filtered_keyframes": 105,
+    "saved_files": 105,
+    "output_folder": "V458",
+    "status": "success"
+  },
+  "L26_V459.mp4": {
+    "video_name": "L26_V459.mp4",
+    "total_scenes": 102,
+    "original_keyframes": 612,
+    "filtered_keyframes": 111,
+    "saved_files": 111,
+    "output_folder": "V459",
+    "status": "success"
+  },
+  "L26_V460.mp4": {
+    "video_name": "L26_V460.mp4",
+    "total_scenes": 93,
+    "original_keyframes": 558,
+    "filtered_keyframes": 100,
+    "saved_files": 100,
+    "output_folder": "V460",
+    "status": "success"
+  },
+  "L26_V461.mp4": {
+    "video_name": "L26_V461.mp4",
+    "total_scenes": 114,
+    "original_keyframes": 684,
+    "filtered_keyframes": 121,
+    "saved_files": 121,
+    "output_folder": "V461",
+    "status": "success"
+  },
+  "L26_V462.mp4": {
+    "video_name": "L26_V462.mp4",
+    "total_scenes": 104,
+    "original_keyframes": 624,
+    "filtered_keyframes": 116,
+    "saved_files": 116,
+    "output_folder": "V462",
+    "status": "success"
+  },
+  "L26_V463.mp4": {
+    "video_name": "L26_V463.mp4",
+    "total_scenes": 93,
+    "original_keyframes": 558,
+    "filtered_keyframes": 99,
+    "saved_files": 99,
+    "output_folder": "V463",
+    "status": "success"
+  },
+  "L26_V464.mp4": {
+    "video_name": "L26_V464.mp4",
+    "total_scenes": 98,
+    "original_keyframes": 588,
+    "filtered_keyframes": 107,
+    "saved_files": 107,
+    "output_folder": "V464",
+    "status": "success"
+  },
+  "L26_V465.mp4": {
+    "video_name": "L26_V465.mp4",
+    "total_scenes": 102,
+    "original_keyframes": 612,
+    "filtered_keyframes": 109,
+    "saved_files": 109,
+    "output_folder": "V465",
+    "status": "success"
+  },
+  "L26_V466.mp4": {
+    "video_name": "L26_V466.mp4",
+    "total_scenes": 115,
+    "original_keyframes": 690,
+    "filtered_keyframes": 121,
+    "saved_files": 121,
+    "output_folder": "V466",
+    "status": "success"
+  },
+  "L26_V467.mp4": {
+    "video_name": "L26_V467.mp4",
+    "total_scenes": 93,
+    "original_keyframes": 558,
+    "filtered_keyframes": 100,
+    "saved_files": 100,
+    "output_folder": "V467",
+    "status": "success"
+  },
+  "L26_V468.mp4": {
+    "video_name": "L26_V468.mp4",
+    "total_scenes": 107,
+    "original_keyframes": 642,
+    "filtered_keyframes": 115,
+    "saved_files": 115,
+    "output_folder": "V468",
+    "status": "success"
+  },
+  "L26_V469.mp4": {
+    "video_name": "L26_V469.mp4",
+    "total_scenes": 109,
+    "original_keyframes": 654,
+    "filtered_keyframes": 115,
+    "saved_files": 115,
+    "output_folder": "V469",
+    "status": "success"
+  },
+  "L26_V470.mp4": {
+    "video_name": "L26_V470.mp4",
+    "total_scenes": 107,
+    "original_keyframes": 642,
+    "filtered_keyframes": 114,
+    "saved_files": 114,
+    "output_folder": "V470",
+    "status": "success"
+  },
+  "L26_V471.mp4": {
+    "video_name": "L26_V471.mp4",
+    "total_scenes": 115,
+    "original_keyframes": 690,
+    "filtered_keyframes": 123,
+    "saved_files": 123,
+    "output_folder": "V471",
+    "status": "success"
+  },
+  "L26_V472.mp4": {
+    "video_name": "L26_V472.mp4",
+    "total_scenes": 101,
+    "original_keyframes": 606,
+    "filtered_keyframes": 108,
+    "saved_files": 108,
+    "output_folder": "V472",
+    "status": "success"
+  },
+  "L26_V473.mp4": {
+    "video_name": "L26_V473.mp4",
+    "total_scenes": 89,
+    "original_keyframes": 534,
+    "filtered_keyframes": 98,
+    "saved_files": 98,
+    "output_folder": "V473",
+    "status": "success"
+  },
+  "L26_V474.mp4": {
+    "video_name": "L26_V474.mp4",
+    "total_scenes": 95,
+    "original_keyframes": 570,
+    "filtered_keyframes": 101,
+    "saved_files": 101,
+    "output_folder": "V474",
+    "status": "success"
+  },
+  "L26_V475.mp4": {
+    "video_name": "L26_V475.mp4",
+    "total_scenes": 99,
+    "original_keyframes": 594,
+    "filtered_keyframes": 106,
+    "saved_files": 106,
+    "output_folder": "V475",
+    "status": "success"
+  },
+  "L26_V476.mp4": {
+    "video_name": "L26_V476.mp4",
+    "total_scenes": 122,
+    "original_keyframes": 732,
+    "filtered_keyframes": 130,
+    "saved_files": 130,
+    "output_folder": "V476",
+    "status": "success"
+  },
+  "L26_V477.mp4": {
+    "video_name": "L26_V477.mp4",
+    "total_scenes": 110,
+    "original_keyframes": 660,
+    "filtered_keyframes": 117,
+    "saved_files": 117,
+    "output_folder": "V477",
+    "status": "success"
+  },
+  "L26_V478.mp4": {
+    "video_name": "L26_V478.mp4",
+    "total_scenes": 104,
+    "original_keyframes": 624,
+    "filtered_keyframes": 115,
+    "saved_files": 115,
+    "output_folder": "V478",
+    "status": "success"
+  },
+  "L26_V479.mp4": {
+    "video_name": "L26_V479.mp4",
+    "total_scenes": 127,
+    "original_keyframes": 762,
+    "filtered_keyframes": 136,
+    "saved_files": 136,
+    "output_folder": "V479",
+    "status": "success"
+  },
+  "L26_V480.mp4": {
+    "video_name": "L26_V480.mp4",
+    "total_scenes": 105,
+    "original_keyframes": 630,
+    "filtered_keyframes": 117,
+    "saved_files": 117,
+    "output_folder": "V480",
+    "status": "success"
+  },
+  "L26_V481.mp4": {
+    "video_name": "L26_V481.mp4",
+    "total_scenes": 115,
+    "original_keyframes": 690,
+    "filtered_keyframes": 128,
+    "saved_files": 128,
+    "output_folder": "V481",
+    "status": "success"
+  },
+  "L26_V482.mp4": {
+    "video_name": "L26_V482.mp4",
+    "total_scenes": 118,
+    "original_keyframes": 708,
+    "filtered_keyframes": 128,
+    "saved_files": 128,
+    "output_folder": "V482",
+    "status": "success"
+  },
+  "L26_V483.mp4": {
+    "video_name": "L26_V483.mp4",
+    "total_scenes": 115,
+    "original_keyframes": 690,
+    "filtered_keyframes": 125,
+    "saved_files": 125,
+    "output_folder": "V483",
+    "status": "success"
+  },
+  "L26_V484.mp4": {
+    "video_name": "L26_V484.mp4",
+    "total_scenes": 104,
+    "original_keyframes": 624,
+    "filtered_keyframes": 113,
+    "saved_files": 113,
+    "output_folder": "V484",
+    "status": "success"
+  },
+  "L26_V485.mp4": {
+    "video_name": "L26_V485.mp4",
+    "total_scenes": 118,
+    "original_keyframes": 708,
+    "filtered_keyframes": 126,
+    "saved_files": 126,
+    "output_folder": "V485",
+    "status": "success"
+  },
+  "L26_V486.mp4": {
+    "video_name": "L26_V486.mp4",
+    "total_scenes": 109,
+    "original_keyframes": 654,
+    "filtered_keyframes": 119,
+    "saved_files": 119,
+    "output_folder": "V486",
+    "status": "success"
+  },
+  "L26_V487.mp4": {
+    "video_name": "L26_V487.mp4",
+    "total_scenes": 112,
+    "original_keyframes": 672,
+    "filtered_keyframes": 120,
+    "saved_files": 120,
+    "output_folder": "V487",
+    "status": "success"
+  },
+  "L26_V488.mp4": {
+    "video_name": "L26_V488.mp4",
+    "total_scenes": 123,
+    "original_keyframes": 738,
+    "filtered_keyframes": 130,
+    "saved_files": 130,
+    "output_folder": "V488",
+    "status": "success"
+  },
+  "L26_V489.mp4": {
+    "video_name": "L26_V489.mp4",
+    "total_scenes": 116,
+    "original_keyframes": 696,
+    "filtered_keyframes": 127,
+    "saved_files": 127,
+    "output_folder": "V489",
+    "status": "success"
+  },
+  "L26_V490.mp4": {
+    "video_name": "L26_V490.mp4",
+    "total_scenes": 130,
+    "original_keyframes": 780,
+    "filtered_keyframes": 137,
+    "saved_files": 137,
+    "output_folder": "V490",
+    "status": "success"
+  },
+  "L26_V491.mp4": {
+    "video_name": "L26_V491.mp4",
+    "total_scenes": 124,
+    "original_keyframes": 744,
+    "filtered_keyframes": 132,
+    "saved_files": 132,
+    "output_folder": "V491",
+    "status": "success"
+  },
+  "L26_V492.mp4": {
+    "video_name": "L26_V492.mp4",
+    "total_scenes": 100,
+    "original_keyframes": 600,
+    "filtered_keyframes": 112,
+    "saved_files": 112,
+    "output_folder": "V492",
+    "status": "success"
+  },
+  "L26_V493.mp4": {
+    "video_name": "L26_V493.mp4",
+    "total_scenes": 102,
+    "original_keyframes": 612,
+    "filtered_keyframes": 111,
+    "saved_files": 111,
+    "output_folder": "V493",
+    "status": "success"
+  },
+  "L26_V494.mp4": {
+    "video_name": "L26_V494.mp4",
+    "total_scenes": 95,
+    "original_keyframes": 570,
+    "filtered_keyframes": 102,
+    "saved_files": 102,
+    "output_folder": "V494",
+    "status": "success"
+  },
+  "L26_V495.mp4": {
+    "video_name": "L26_V495.mp4",
+    "total_scenes": 131,
+    "original_keyframes": 786,
+    "filtered_keyframes": 138,
+    "saved_files": 138,
+    "output_folder": "V495",
+    "status": "success"
+  },
+  "L26_V496.mp4": {
+    "video_name": "L26_V496.mp4",
+    "total_scenes": 123,
+    "original_keyframes": 738,
+    "filtered_keyframes": 130,
+    "saved_files": 130,
+    "output_folder": "V496",
+    "status": "success"
+  },
+  "L26_V497.mp4": {
+    "video_name": "L26_V497.mp4",
+    "total_scenes": 108,
+    "original_keyframes": 648,
+    "filtered_keyframes": 118,
+    "saved_files": 118,
+    "output_folder": "V497",
+    "status": "success"
+  },
+  "L26_V498.mp4": {
+    "video_name": "L26_V498.mp4",
+    "total_scenes": 105,
+    "original_keyframes": 630,
+    "filtered_keyframes": 114,
+    "saved_files": 114,
+    "output_folder": "V498",
+    "status": "success"
+  },
+  "L26_V499.mp4": {
+    "video_name": "L26_V499.mp4",
+    "total_scenes": 104,
+    "original_keyframes": 624,
+    "filtered_keyframes": 113,
+    "saved_files": 113,
+    "output_folder": "V499",
+    "status": "success"
+  }
+}
