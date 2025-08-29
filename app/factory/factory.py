@@ -14,7 +14,7 @@ from repository.mongo import KeyframeRepository
 from repository.milvus import KeyframeVectorRepository
 from service import KeyframeQueryService, ModelService
 from models.keyframe import Keyframe
-import open_clip
+from core.beit3_processor import load_model_and_processor
 from pymilvus import connections, Collection as MilvusCollection
 
 
@@ -27,7 +27,8 @@ class ServiceFactory:
         milvus_user: str ,
         milvus_password: str ,
         milvus_search_params: dict,
-        model_name: str ,
+        model_checkpoint: str,
+        tokenizer_checkpoint: str,
         milvus_db_name: str = "default",
         milvus_alias: str = "default",
         mongo_collection=Keyframe,
@@ -44,7 +45,7 @@ class ServiceFactory:
             alias=milvus_alias
         )
 
-        self._model_service = self._init_model_service(model_name)
+        self._model_service = self._init_model_service(model_checkpoint, tokenizer_checkpoint)
 
         self._keyframe_query_service = KeyframeQueryService(
             keyframe_mongo_repo=self._mongo_keyframe_repo,
@@ -80,10 +81,11 @@ class ServiceFactory:
 
         return KeyframeVectorRepository(collection=collection, search_params=search_params)
 
-    def _init_model_service(self, model_name: str):
-        model, _, preprocess = open_clip.create_model_and_transforms(model_name)
-        tokenizer = open_clip.get_tokenizer(model_name)
-        return ModelService(model=model, preprocess=preprocess, tokenizer=tokenizer)
+    def _init_model_service(self, model_checkpoint: str, tokenizer_checkpoint: str):
+        return ModelService(
+            model_checkpoint=model_checkpoint,
+            tokenizer_checkpoint=tokenizer_checkpoint
+        )
 
     def get_mongo_keyframe_repo(self):
         return self._mongo_keyframe_repo

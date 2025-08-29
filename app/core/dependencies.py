@@ -1,3 +1,24 @@
+import sys
+import os
+
+# Add the project root directory to sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from beit3 import modeling_finetune
+import torch
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
+import argparse
+import time
+from torchvision import transforms
+from transformers import XLMRobertaTokenizer
+from timm import create_model
+from timm.data.constants import IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
 from pathlib import Path
 from fastapi import Depends, Request, HTTPException

@@ -66,10 +66,10 @@ class QueryController:
         top_k: int,
         score_threshold: float
     ):
-        embedding = self.model_service.embedding(query).tolist()[0]
+        embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text(embedding, top_k, score_threshold)
         
-        # Trả về list KeyframeServiceReponse cho API endpoint
+        # Trả về list KeyframeServiceReponse cho API e  ndpoint
         return raw_result
 
     async def search_text_with_exclude_group(
@@ -84,7 +84,7 @@ class QueryController:
             if int(v.split('/')[0]) in list_group_exclude
         ]
         
-        embedding = self.model_service.embedding(query).tolist()[0]
+        embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
@@ -122,7 +122,7 @@ class QueryController:
                 )
             ]
 
-        embedding = self.model_service.embedding(query).tolist()[0]
+        embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
