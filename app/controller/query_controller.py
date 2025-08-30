@@ -16,7 +16,6 @@ from schema.response import KeyframeServiceReponse
 from config import DATA_FOLDER_PATH, API_BASE_URL
 
 class QueryController:
-    
     def __init__(
         self,
         data_folder: Path,
@@ -27,26 +26,29 @@ class QueryController:
     ):
         self.data_folder = DATA_FOLDER_PATH
         self.id2index = json.load(open(id2index_path, 'r'))
+        print(f"Loaded id2index from: {id2index_path}")
+        print(f"Sample data: {list(self.id2index.items())[:5]}")
+
         self.model_service = model_service
         self.keyframe_service = keyframe_service
         self.base_url = API_BASE_URL
-    
+
     def convert_model_to_path(
         self,
         model: KeyframeServiceReponse
     ) -> tuple[str, float]:
         """Convert KeyframeServiceReponse object thành path và score"""
         path = os.path.join(
-            self.data_folder, 
+            self.data_folder,
             f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num}.webp"
         )
         return path, model.confidence_score
-    
+
     def get_image_url(self, relative_path: str) -> str:
         """Convert relative path thành HTTP URL"""
         normalized_path = relative_path.replace('\\', '/')
         return f"{self.base_url}/images/{normalized_path}"
-    
+
     def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
         """Convert KeyframeServiceReponse thành format cho frontend"""
         # Tạo relative path
@@ -59,17 +61,15 @@ class QueryController:
             "group_id": model.group_num,
             "keyframe_id": model.keyframe_num
         }
-        
+
     async def search_text(
-        self, 
+        self,
         query: str,
         top_k: int,
         score_threshold: float
     ):
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text(embedding, top_k, score_threshold)
-        
-        # Trả về list KeyframeServiceReponse cho API e  ndpoint
         return raw_result
 
     async def search_text_with_exclude_group(
@@ -77,54 +77,52 @@ class QueryController:
         query: str,
         top_k: int,
         score_threshold: float,
-        list_group_exclude: list[int]
+        list_group_exclude: list[str]  # đã chuẩn hóa sang str từ schema
     ):
         exclude_ids = [
             int(k) for k, v in self.id2index.items()
-            if int(v.split('/')[0]) in list_group_exclude
+            if v.split('/')[0] in list_group_exclude  # so sánh chuỗi -> chuỗi
         ]
-        
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
-        
         return raw_result
+
 
     async def search_with_selected_video_group(
         self,
         query: str,
         top_k: int,
         score_threshold: float,
-        list_of_include_groups: list[int],
-        list_of_include_videos: list[int]  
-    ):     
+        list_of_include_groups: list[str],  # đã chuẩn hóa
+        list_of_include_videos: list[int]
+    ):
         exclude_ids = None
-        
-        if len(list_of_include_groups) > 0 and len(list_of_include_videos) == 0:
+
+        include_groups_set = set(list_of_include_groups)
+        include_videos_set = set(list_of_include_videos)
+
+        if len(include_groups_set) > 0 and len(include_videos_set) == 0:
             exclude_ids = [
                 int(k) for k, v in self.id2index.items()
-                if int(v.split('/')[0]) not in list_of_include_groups
+                if v.split('/')[0] not in include_groups_set
             ]
-        elif len(list_of_include_groups) == 0 and len(list_of_include_videos) > 0:
+        elif len(include_groups_set) == 0 and len(include_videos_set) > 0:
             exclude_ids = [
                 int(k) for k, v in self.id2index.items()
-                if int(v.split('/')[1]) not in list_of_include_videos
+                if int(v.split('/')[1]) not in include_videos_set
             ]
-        elif len(list_of_include_groups) == 0 and len(list_of_include_videos) == 0:
+        elif len(include_groups_set) == 0 and len(include_videos_set) == 0:
             exclude_ids = []
         else:
             exclude_ids = [
                 int(k) for k, v in self.id2index.items()
-                if (
-                    int(v.split('/')[0]) not in list_of_include_groups or
-                    int(v.split('/')[1]) not in list_of_include_videos
-                )
+                if (v.split('/')[0] not in include_groups_set or int(v.split('/')[1]) not in include_videos_set)
             ]
 
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
-        
         return raw_result

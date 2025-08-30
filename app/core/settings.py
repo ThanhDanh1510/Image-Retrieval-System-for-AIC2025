@@ -40,5 +40,5 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
 
 class AppSettings(BaseSettings):
     DATA_FOLDER: str = str(BASE_DIR / "images")
-    ID2INDEX_PATH: str = str(BASE_DIR / "id2index.json")
+    ID2INDEX_PATH: str = str(BASE_DIR / "embeddings" / "formatted_batch1.json")
     MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"

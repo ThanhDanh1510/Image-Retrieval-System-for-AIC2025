@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from typing import List, Optional
@@ -8,14 +7,13 @@ from schema.request import (
     TextSearchWithExcludeGroupsRequest,
     TextSearchWithSelectedGroupsAndVideosRequest,
 )
+
 from schema.response import KeyframeServiceReponse, SingleKeyframeDisplay, KeyframeDisplay
 from controller.query_controller import QueryController
 from core.dependencies import get_query_controller
 from core.logger import SimpleLogger
 
-
 logger = SimpleLogger(__name__)
-
 
 router = APIRouter(
     prefix="/keyframe",
@@ -23,27 +21,25 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-
 @router.post(
     "/search",
     response_model=KeyframeDisplay,
     summary="Simple text search for keyframes",
     description="""
     Perform a simple text-based search for keyframes using semantic similarity.
-    
-    This endpoint converts the input text query to an embedding and searches for 
+    This endpoint converts the input text query to an embedding and searches for
     the most similar keyframes in the database.
-    
+
     **Parameters:**
     - **query**: The search text (1-1000 characters)
     - **top_k**: Maximum number of results to return (1-100, default: 10)
     - **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.0)
-    
+
     **Returns:**
     List of keyframes with their metadata and confidence scores, ordered by similarity.
-    
+
     **Example:**
-    ```json
+    ```
     {
         "query": "person walking in the park",
         "top_k": 5,
@@ -68,7 +64,7 @@ async def search_keyframes(
     
     logger.info(f"Found {len(results)} results for query: '{request.query}'")
     
-    # 🔹 Fix: Sử dụng convert_model_to_path đúng cách
+    # Sử dụng convert_to_display_result
     display_results = []
     for result in results:
         display_data = controller.convert_to_display_result(result)
@@ -79,38 +75,21 @@ async def search_keyframes(
     
     return KeyframeDisplay(results=display_results)
 
-    
-
-
-
 @router.post(
     "/search/exclude-groups",
     response_model=KeyframeDisplay,
     summary="Text search with group exclusion",
     description="""
     Perform text-based search for keyframes while excluding specific groups.
-    
-    This endpoint allows you to search for keyframes while filtering out 
-    results from specified groups (e.g., to avoid certain video categories).
-    
-    **Parameters:**
-    - **query**: The search text
-    - **top_k**: Maximum number of results to return
-    - **score_threshold**: Minimum confidence score
-    - **exclude_groups**: List of group IDs to exclude from results
-    
-    **Use Cases:**
-    - Exclude specific video categories or datasets
-    - Filter out content from certain time periods
-    - Remove specific collections from search results
+    Groups can be specified as integers or strings - they will be automatically converted to strings.
     
     **Example:**
-    ```json
+    ```
     {
         "query": "sunset landscape",
         "top_k": 15,
         "score_threshold": 0.6,
-        "exclude_groups": [1, 3, 7]
+        "exclude_groups": ["1", 3, "group_7"]
     }
     ```
     """,
@@ -127,12 +106,11 @@ async def search_keyframes_exclude_groups(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
-        list_group_exclude=request.exclude_groups
+        list_group_exclude=request.exclude_groups  # Đã được convert thành str bởi validator
     )
     
     logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")
     
-    # 🔹 Fix: Xử lý từng result riêng lẻ
     display_results = []
     for result in results:
         display_data = controller.convert_to_display_result(result)
@@ -143,43 +121,23 @@ async def search_keyframes_exclude_groups(
     
     return KeyframeDisplay(results=display_results)
 
-
-
 @router.post(
     "/search/selected-groups-videos",
     response_model=KeyframeDisplay,
     summary="Text search within selected groups and videos",
     description="""
     Perform text-based search for keyframes within specific groups and videos only.
-    
-    This endpoint allows you to limit your search to specific groups and videos,
-    effectively creating a filtered search scope.
-    
-    **Parameters:**
-    - **query**: The search text
-    - **top_k**: Maximum number of results to return
-    - **score_threshold**: Minimum confidence score
-    - **include_groups**: List of group IDs to search within
-    - **include_videos**: List of video IDs to search within
-    
-    **Behavior:**
-    - Only keyframes from the specified groups AND videos will be searched
-    - If a keyframe belongs to an included group OR an included video, it will be considered
-    - Empty lists mean no filtering for that category
-    
-    **Use Cases:**
-    - Search within specific video collections
-    - Focus on particular time periods or datasets
-    - Limit search to curated content sets
+    Groups can be specified as integers or strings - they will be automatically converted to strings.
+    Videos remain as integers.
     
     **Example:**
-    ```json
+    ```
     {
         "query": "car driving on highway",
         "top_k": 20,
         "score_threshold": 0.5,
-        "include_groups": [2, 4, 6],
-        "include_videos": [101, 102, 203, 204]
+        "include_groups": ["2", 4, "group_6"],
+        "include_videos":
     }
     ```
     """,
@@ -196,13 +154,12 @@ async def search_keyframes_selected_groups_videos(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
-        list_of_include_groups=request.include_groups,
-        list_of_include_videos=request.include_videos
+        list_of_include_groups=request.include_groups,  # Đã được convert thành str bởi validator
+        list_of_include_videos=request.include_videos   # Giữ nguyên int
     )
     
     logger.info(f"Found {len(results)} results within selected groups/videos")
     
-    # 🔹 Fix: Xử lý từng result riêng lẻ
     display_results = []
     for result in results:
         display_data = controller.convert_to_display_result(result)
@@ -212,4 +169,3 @@ async def search_keyframes_selected_groups_videos(
         ))
     
     return KeyframeDisplay(results=display_results)
-

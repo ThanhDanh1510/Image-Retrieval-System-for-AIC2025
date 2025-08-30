@@ -33,21 +33,27 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
     ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
   }, [value]);
 
-  const parseIds = (str) =>
-    str.split(",").map((s) => s.trim()).filter(Boolean).map(Number);
+// Giữ nguyên chuỗi cho groups (cho phép chữ số và dấu như 25_a1)
+// Cắt bỏ khoảng trắng và bỏ rỗng
+  const parseGroupIds = (str) => str.split(",").map(s => s.trim()).filter(Boolean);
+
+  // Videos vẫn parse số nguyên
+  const parseVideoIds = (str) => str.split(",").map(s => s.trim()).filter(Boolean).map(Number);
+
 
   const handleSubmit = () => {
     const extras =
       mode === "Exclude Groups"
-        ? { exclude_groups: parseIds(excludeGroups) }
+        ? { exclude_groups: parseGroupIds(excludeGroups) }
         : mode === "Include Groups & Videos"
         ? {
-            include_groups: parseIds(includeGroups),
-            include_videos: parseIds(includeVideos),
+            include_groups: parseGroupIds(includeGroups),
+            include_videos: parseVideoIds(includeVideos),
           }
         : {};
     onSubmit?.(value, mode, { ...extras, top_k: topK, score_threshold: scoreThreshold });
   };
+
 
   const stripLeadingZeros = (val) => {
     if (val === "") return val;

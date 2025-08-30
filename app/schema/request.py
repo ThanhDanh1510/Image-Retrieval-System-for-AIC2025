@@ -1,6 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
-
+from pydantic import BaseModel, Field, validator
+from typing import List, Union
 
 class BaseSearchRequest(BaseModel):
     """Base search request with common parameters"""
@@ -16,21 +15,33 @@ class TextSearchRequest(BaseSearchRequest):
 
 class TextSearchWithExcludeGroupsRequest(BaseSearchRequest):
     """Text search request with group exclusion"""
-    exclude_groups: List[int] = Field(
+    exclude_groups: List[Union[int, str]] = Field(
         default_factory=list,
-        description="List of group IDs to exclude from search results",
+        description="List of group IDs to exclude from search results (can be int or str)",
     )
+
+    @validator('exclude_groups', pre=True)
+    def convert_groups_to_str(cls, v):
+        """Convert all group IDs to strings"""
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return v
 
 
 class TextSearchWithSelectedGroupsAndVideosRequest(BaseSearchRequest):
     """Text search request with specific group and video selection"""
-    include_groups: List[int] = Field(
+    include_groups: List[Union[int, str]] = Field(
         default_factory=list,
-        description="List of group IDs to include in search results",
+        description="List of group IDs to include in search results (can be int or str)",
     )
     include_videos: List[int] = Field(
         default_factory=list,
         description="List of video IDs to include in search results",
     )
 
-
+    @validator('include_groups', pre=True)
+    def convert_groups_to_str(cls, v):
+        """Convert all group IDs to strings"""
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return v
