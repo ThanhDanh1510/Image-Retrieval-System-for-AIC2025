@@ -227,6 +227,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 data/
+metadata/
 images/
 embeddings/
 beit3.spm

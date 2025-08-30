@@ -50,16 +50,17 @@ class QueryController:
         return f"{self.base_url}/images/{normalized_path}"
 
     def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
-        """Convert KeyframeServiceReponse thành format cho frontend"""
-        # Tạo relative path
         relative_path = f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num}.webp"
-        
+        video_name = f"L{model.group_num}_V{model.video_num:03d}"
+        name_img = str(model.keyframe_num)  # Convert sang string để tránh lỗi validation
+
+        path = self.get_image_url(relative_path)
+
         return {
-            "path": self.get_image_url(relative_path),
+            "path": path,
+            "video_name": video_name,
+            "name_img": name_img,
             "score": model.confidence_score,
-            "video_id": model.video_num,
-            "group_id": model.group_num,
-            "keyframe_id": model.keyframe_num
         }
 
     async def search_text(

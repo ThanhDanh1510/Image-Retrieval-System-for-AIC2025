@@ -13,6 +13,8 @@ class KeyframeServiceReponse(BaseModel):
 class SingleKeyframeDisplay(BaseModel):
     path: str
     score: float
+    video_name: str
+    name_img: str
 
 class KeyframeDisplay(BaseModel):
     results: list[SingleKeyframeDisplay]
