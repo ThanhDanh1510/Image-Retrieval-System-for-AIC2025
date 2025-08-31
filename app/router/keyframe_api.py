@@ -118,7 +118,9 @@ async def search_keyframes_exclude_groups(
         display_data = controller.convert_to_display_result(result)
         display_results.append(SingleKeyframeDisplay(
             path=display_data["path"],
-            score=display_data["score"]
+            score=display_data["score"],
+            video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
+            name_img=display_data.get("name_img", "")   
         ))
     
     return KeyframeDisplay(results=display_results)
@@ -166,8 +168,10 @@ async def search_keyframes_selected_groups_videos(
     for result in results:
         display_data = controller.convert_to_display_result(result)
         display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"]
+           path=display_data["path"],
+            score=display_data["score"],
+            video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
+            name_img=display_data.get("name_img", "")   
         ))
     
     return KeyframeDisplay(results=display_results)

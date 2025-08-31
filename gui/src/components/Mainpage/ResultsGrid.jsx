@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import YoutubePlayerWithFrameCounter from "./YoutubePlayerWithFrameCounter";
 
 export default function ResultsGrid({ results }) {
   const [selectedResult, setSelectedResult] = useState(null);
@@ -71,8 +72,16 @@ export default function ResultsGrid({ results }) {
       const videoId = urlObj.searchParams.get("v");
       if (!videoId) return null;
       const startSeconds = Math.floor(getVideoTimeSeconds(name_img, video_name));
-      // Sửa lại tham số query đúng cú pháp & thay vì &amp;
       return `https://www.youtube.com/embed/${videoId}?start=${startSeconds}&autoplay=1&rel=0&modestbranding=1`;
+    } catch {
+      return null;
+    }
+  };
+
+  const getVideoIdFromUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.searchParams.get("v");
     } catch {
       return null;
     }
@@ -194,18 +203,14 @@ export default function ResultsGrid({ results }) {
                 </div>
               </div>
 
-              {/* Hiển thị video YouTube nhúng khi bấm Play */}
+              {/* Hiển thị video YouTube iframe và frame counter khi bật */}
               {showVideo && (
                 <div className="flex justify-center">
-                  {getYoutubeEmbedUrl(selectedResult.video_name, selectedResult.name_img) ? (
-                    <iframe
-                      width="100%"
-                      height="365"
-                      src={getYoutubeEmbedUrl(selectedResult.video_name, selectedResult.name_img)}
-                      title="YouTube video player"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      style={{ border: "none", borderRadius: "8px" }}
+                  {youtubeLinks[selectedResult.video_name] ? (
+                    <YoutubePlayerWithFrameCounter
+                      videoId={getVideoIdFromUrl(youtubeLinks[selectedResult.video_name])}
+                      startSeconds={Math.floor(getVideoTimeSeconds(selectedResult.name_img, selectedResult.video_name))}
+                      fps={fpsMap[selectedResult.video_name] ?? 25}
                     />
                   ) : (
                     <p className="text-red-600">Video YouTube không khả dụng</p>
