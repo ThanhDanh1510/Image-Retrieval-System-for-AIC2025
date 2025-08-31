@@ -52,8 +52,7 @@ class QueryController:
     def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
         relative_path = f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num}.webp"
         video_name = f"L{model.group_num}_V{model.video_num:03d}"
-        name_img = str(model.keyframe_num)  # Convert sang string để tránh lỗi validation
-
+        name_img = str(model.keyframe_num)
         path = self.get_image_url(relative_path)
 
         return {
