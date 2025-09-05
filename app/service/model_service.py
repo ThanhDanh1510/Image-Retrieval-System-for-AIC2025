@@ -1,6 +1,23 @@
+import os
 import torch
 import numpy as np
 from core.beit3_processor import load_model_and_processor, Processor
+
+
+def pick_device():
+    # Cho phép ép device qua biến môi trường: DEVICE=cpu|cuda|mps
+    forced = os.getenv("DEVICE", "").lower()
+    if forced in {"cpu", "cuda", "mps"}:
+        return torch.device(forced)
+
+    # Ưu tiên MPS cho Apple Silicon
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    # Nếu chạy trên máy có NVIDIA thì dùng CUDA
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    # Mặc định CPU
+    return torch.device("cpu")
 
 
 class ModelService:
@@ -8,11 +25,13 @@ class ModelService:
         self,
         model_checkpoint: str,
         tokenizer_checkpoint: str,
-        device: str = 'cuda'
+        device: str | None = None,   # đổi mặc định: không ép 'cuda'
     ):
-        self.device = device
+        # chọn device: ưu tiên tham số -> env -> auto-detect
+        self.device = torch.device(device) if device else pick_device()
+
         self.model, self.processor = load_model_and_processor(model_checkpoint, tokenizer_checkpoint)
-        self.model = self.model.to(device)
+        self.model = self.model.to(self.device)   # dùng self.device
         self.model.eval()
 
     def embedding(self, query_text: str):
@@ -31,4 +50,3 @@ class ModelService:
         # (B, D) -> (D,) -> list[float]
         emb = query_embedding.squeeze(0).detach().cpu().float().ravel().tolist()
         return emb
-

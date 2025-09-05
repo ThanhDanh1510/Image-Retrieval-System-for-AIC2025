@@ -66,8 +66,8 @@ async def lifespan(app: FastAPI):
             milvus_user="",  
             milvus_password="",  
             milvus_search_params=milvus_search_params,
-            model_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
-            tokenizer_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",  # Thay bằng đường dẫn thực tế
+            model_checkpoint=r"/Users/tranducthien/Documents/AIC2025/Image-Retrieval-System-for-AIC2025/beit3/beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
+            tokenizer_checkpoint=r"/Users/tranducthien/Documents/AIC2025/Image-Retrieval-System-for-AIC2025/beit3/beit3.spm",  # Thay bằng đường dẫn thực tế
             mongo_collection=Keyframe
         )
         logger.info("Service factory initialized successfully")
