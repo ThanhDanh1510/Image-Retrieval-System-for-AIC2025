@@ -41,6 +41,7 @@ from service import ModelService, KeyframeQueryService
 from core.settings import KeyFrameIndexMilvusSetting, MongoDBSettings, AppSettings
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
+from service.ocr_service import OcrQueryService
 
 logger = SimpleLogger(__name__)
 
@@ -116,6 +117,9 @@ def get_keyframe_service(service_factory: ServiceFactory = Depends(get_service_f
             detail=f"Keyframe service initialization failed: {str(e)}"
         )
 
+def get_ocr_service(service_factory: ServiceFactory = Depends(get_service_factory)) -> OcrQueryService:
+    """Get OCR query service from ServiceFactory"""
+    return service_factory.get_ocr_query_service()
 
 
 def get_mongo_client(request: Request):
@@ -162,6 +166,7 @@ def get_milvus_repository(service_factory: ServiceFactory = Depends(get_service_
 def get_query_controller(
     model_service: ModelService = Depends(get_model_service),
     keyframe_service: KeyframeQueryService = Depends(get_keyframe_service),
+    ocr_service: OcrQueryService = Depends(get_ocr_service),
     milvus_settings: KeyFrameIndexMilvusSetting = Depends(get_milvus_settings),
     app_settings: AppSettings = Depends(get_app_settings)
 ) -> QueryController:
@@ -186,7 +191,8 @@ def get_query_controller(
             data_folder=data_folder,
             id2index_path=id2index_path,
             model_service=model_service,
-            keyframe_service=keyframe_service
+            keyframe_service=keyframe_service,
+            ocr_service=ocr_service
         )
         
         logger.info("Query controller created successfully")

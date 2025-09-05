@@ -21,6 +21,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+
 @router.post(
     "/search",
     response_model=KeyframeDisplay,
@@ -174,4 +175,94 @@ async def search_keyframes_selected_groups_videos(
             name_img=display_data.get("name_img", "")   
         ))
     
+    return KeyframeDisplay(results=display_results)
+
+@router.post(
+    "/search/ocr",
+    response_model=KeyframeDisplay,
+    summary="OCR text search for keyframes",
+    description="Perform text search on OCR data of keyframes using Elasticsearch with Vietnamese analysis.",
+    response_description="List of matching keyframes based on OCR text"
+)
+async def search_keyframes_ocr(
+    request: TextSearchRequest, # Có thể tái sử dụng hoặc tạo schema mới nếu cần
+    controller: QueryController = Depends(get_query_controller)
+):
+    """Search for keyframes using OCR text."""
+    logger.info(f"OCR search request: query='{request.query}', top_k={request.top_k}")
+    
+    results = await controller.search_ocr(
+        query=request.query,
+        top_k=request.top_k
+    )
+    
+    logger.info(f"Found {len(results)} OCR results for query: '{request.query}'")
+    
+    # Logic hiển thị kết quả hoàn toàn giống với các endpoint khác
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"],
+            video_name=display_data["video_name"],
+            name_img=display_data["name_img"]
+        ))
+    
+    return KeyframeDisplay(results=display_results)
+
+@router.post(
+    "/search/ocr/exclude-groups",
+    response_model=KeyframeDisplay,
+    summary="OCR search with group exclusion",
+    description="Perform OCR-based search while excluding specific groups."
+)
+async def search_keyframes_ocr_exclude_groups(
+    request: TextSearchWithExcludeGroupsRequest,
+    controller: QueryController = Depends(get_query_controller)
+):
+    """OCR search with group exclusion filtering."""
+    results = await controller.search_ocr_with_exclude_group(
+        query=request.query,
+        top_k=request.top_k,
+        exclude_groups=request.exclude_groups
+    )
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"],
+            video_name=display_data["video_name"],
+            name_img=display_data["name_img"]
+        ))
+    return KeyframeDisplay(results=display_results)
+    
+
+@router.post(
+    "/search/ocr/selected-groups-videos",
+    response_model=KeyframeDisplay,
+    summary="OCR search within selected groups and videos",
+    description="Perform OCR-based search within specific groups and videos only."
+)
+async def search_keyframes_ocr_selected_groups_videos(
+    request: TextSearchWithSelectedGroupsAndVideosRequest,
+    controller: QueryController = Depends(get_query_controller)
+):
+    """OCR search within selected groups and videos."""
+    results = await controller.search_ocr_with_selected_video_group(
+        query=request.query,
+        top_k=request.top_k,
+        include_groups=request.include_groups,
+        include_videos=request.include_videos
+    )
+    display_results = []
+    for result in results:
+        display_data = controller.convert_to_display_result(result)
+        display_results.append(SingleKeyframeDisplay(
+            path=display_data["path"],
+            score=display_data["score"],
+            video_name=display_data["video_name"],
+            name_img=display_data["name_img"]
+        ))
     return KeyframeDisplay(results=display_results)

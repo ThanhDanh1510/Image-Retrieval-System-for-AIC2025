@@ -1,4 +1,4 @@
-
+# keyframe_search_project/docker-compose.yml
 
 services:
   etcd:
@@ -97,12 +97,43 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  elasticsearch:
+    container_name: elasticsearch
+    build:
+      context: .
+      dockerfile: ./docker/elasticsearch/Dockerfile
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+    environment:
+      ES_JAVA_OPTS: "-Xmx1g -Xms1g"
+      bootstrap.memory_lock: "true"
+      discovery.type: "single-node"
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: changeme
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      memlock:
+        hard: -1
+        soft: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "-u", "elastic:changeme", "http://localhost:9200/_cluster/health?wait_for_status=yellow"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   etcd_data:
   minio_data:
   milvus_data:
   mongodb_data:
+  es_data:
 
 networks:
-  default:
+  milvus_network:
     name: milvus

@@ -37,6 +37,14 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
     SEARCH_PARAMS: dict = {}
 
 
+class ElasticsearchSettings(BaseSettings):
+    ES_HOST: str = Field(..., alias="ES_HOST")
+    ES_PORT: int = Field(..., alias="ES_PORT")
+    ES_USER: str = Field(..., alias="ES_USER")
+    ELASTIC_PASSWORD: str = Field(..., alias="ELASTIC_PASSWORD")
+    ES_OCR_INDEX: str = Field(..., alias="ES_OCR_INDEX")
+
+
 
 class AppSettings(BaseSettings):
     DATA_FOLDER: str = str(BASE_DIR / "images")

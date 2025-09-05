@@ -192,6 +192,17 @@ export default function ResultsGrid({ results }) {
                     </div>
                   </div>
 
+                  {selectedResult?.ocr_text && (
+                    <div className="mb-4 w-full">
+                      <label className="block text-sm font-semibold mb-1 text-purple-600 dark:text-purple-400">OCR Text</label>
+                      <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-700 text-sm leading-relaxed max-h-32 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap font-sans text-gray-800 dark:text-gray-200">
+                          {selectedResult.ocr_text}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
                   {!showVideo && (
                     <button
                       className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"

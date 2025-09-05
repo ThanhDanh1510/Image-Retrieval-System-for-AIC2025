@@ -6,6 +6,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
+
 const MODE_OPTIONS = [
   { key: "Default", label: "Default" },
   { key: "Exclude Groups", label: "Exclude Groups" },
@@ -16,13 +17,14 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
   const [value, setValue] = useState("");
   const [mode, setMode] = useState(initialMode);
 
+  const [searchType, setSearchType] = useState("semantic");
+
   const [excludeGroups, setExcludeGroups] = useState("");
   const [includeGroups, setIncludeGroups] = useState("");
   const [includeVideos, setIncludeVideos] = useState("");
 
   const [topK, setTopK] = useState(40);
   const [scoreThreshold, setScoreThreshold] = useState(0.0);
-
 
   const textareaRef = useRef(null);
 
@@ -51,7 +53,7 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
             include_videos: parseVideoIds(includeVideos),
           }
         : {};
-    onSubmit?.(value, mode, { ...extras, top_k: topK, score_threshold: scoreThreshold });
+    onSubmit?.(value, mode, { ...extras, top_k: topK, score_threshold: scoreThreshold }, searchType);
   };
 
 
@@ -63,6 +65,31 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-2">
+      <div className="flex items-center space-x-3">
+        <div className="flex space-x-2 flex-shrink-0">
+          <button
+            onClick={() => setSearchType("semantic")}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              searchType === "semantic" 
+                ? 'bg-blue-600 text-white shadow-md' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            Semantic Search
+          </button>
+          <button
+            onClick={() => setSearchType("ocr")}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              searchType === "ocr" 
+                ? 'bg-purple-600 text-white shadow-md' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            OCR Search
+          </button>
+        </div>
+      </div>
+      
       <div className="relative">
         <textarea
           ref={textareaRef}

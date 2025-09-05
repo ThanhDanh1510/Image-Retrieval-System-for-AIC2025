@@ -18,8 +18,12 @@ from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettin
 from models.keyframe import Keyframe
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
+from elasticsearch import AsyncElasticsearch # Thêm import
+from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings, ElasticsearchSettings # Thêm ElasticsearchSettings
+
 
 mongo_client: AsyncIOMotorClient = None
+es_client: AsyncElasticsearch = None
 service_factory: ServiceFactory = None
 logger = SimpleLogger(__name__)
 
@@ -35,6 +39,8 @@ async def lifespan(app: FastAPI):
         mongo_settings = MongoDBSettings()
         milvus_settings = KeyFrameIndexMilvusSetting()
         appsetting = AppSettings()
+        es_settings = ElasticsearchSettings()
+        
         global mongo_client
         mongo_connection_string = (
             f"mongodb://{mongo_settings.MONGO_USER}:{mongo_settings.MONGO_PASSWORD}"
@@ -52,6 +58,14 @@ async def lifespan(app: FastAPI):
             document_models=[Keyframe]
         )
         logger.info("Beanie initialized successfully")
+
+        global es_client
+        es_client = AsyncElasticsearch(
+            hosts=[{"host": es_settings.ES_HOST, "port": es_settings.ES_PORT, "scheme": "http"}],
+            basic_auth=(es_settings.ES_USER, es_settings.ELASTIC_PASSWORD)
+        )
+        await es_client.ping()
+        logger.info("Successfully connected to Elasticsearch")
         
         global service_factory
         milvus_search_params = {
@@ -66,14 +80,17 @@ async def lifespan(app: FastAPI):
             milvus_user="",  
             milvus_password="",  
             milvus_search_params=milvus_search_params,
-            model_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
-            tokenizer_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",  # Thay bằng đường dẫn thực tế
+            model_checkpoint=r"D:\AIC\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
+            tokenizer_checkpoint=r"D:\AIC\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",  # Thay bằng đường dẫn thực tế
+            es_client=es_client, # Truyền ES client
+            es_index_name=es_settings.ES_OCR_INDEX, 
             mongo_collection=Keyframe
         )
         logger.info("Service factory initialized successfully")
         
         app.state.service_factory = service_factory
         app.state.mongo_client = mongo_client
+        app.state.es_client = es_client
         
         logger.info("Application startup completed successfully")
         
@@ -90,6 +107,10 @@ async def lifespan(app: FastAPI):
         if mongo_client:
             mongo_client.close()
             logger.info("MongoDB connection closed")
+        
+        if es_client:
+            await es_client.close()
+            logger.info("Elasticsearch connection closed")
             
         logger.info("Application shutdown completed successfully")
         

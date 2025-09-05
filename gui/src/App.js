@@ -20,7 +20,7 @@ function App() {
   const parseIds = (str) =>
     str.split(",").map((s) => s.trim()).filter(Boolean).map(Number);
 
-  const handleSearch = async (query, mode, extras) => {
+  const handleSearch = async (query, mode, extras, searchType) => {
     if (!query.trim()) {
       window.alert("Please enter a search query");
       return;
@@ -39,15 +39,30 @@ function App() {
       score_threshold: extras.score_threshold ?? 0.0,
     };
 
-    if (mode === "Default") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search`;
-    } else if (mode === "Exclude Groups") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search/exclude-groups`;
-      payload.exclude_groups = extras.exclude_groups || [];
-    } else if (mode === "Include Groups & Videos") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search/selected-groups-videos`;
-      payload.include_groups = extras.include_groups || [];
-      payload.include_videos = extras.include_videos || [];
+    // Thêm logic cho OCR search
+    if (searchType === "ocr") {
+      if (mode === "Default") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search/ocr`;
+      } else if (mode === "Exclude Groups") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search/ocr/exclude-groups`;
+        payload.exclude_groups = extras.exclude_groups || [];
+      } else if (mode === "Include Groups & Videos") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search/ocr/selected-groups-videos`;
+        payload.include_groups = extras.include_groups || [];
+        payload.include_videos = extras.include_videos || [];
+      }
+    } else {
+    // Semantic search (logic cũ)
+      if (mode === "Default") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search`;
+      } else if (mode === "Exclude Groups") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search/exclude-groups`;
+        payload.exclude_groups = extras.exclude_groups || [];
+      } else if (mode === "Include Groups & Videos") {
+        endpoint = `${apiUrl}/api/v1/keyframe/search/selected-groups-videos`;
+        payload.include_groups = extras.include_groups || [];
+        payload.include_videos = extras.include_videos || [];
+      }
     }
 
     try {

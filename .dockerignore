@@ -1,0 +1,37 @@
+# Ignore Python cache & build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Ignore virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore git
+.git
+.gitignore
+
+# Ignore dataset / outputs nếu có
+data/
+datasets/
+outputs/
+logs/
+
+# ✅ NHƯNG KHÔNG ignore các file cần cho build
+# Không được bỏ qua java/ và *.sh
+!*.sh
+!coccoc-tokenizer/java/
