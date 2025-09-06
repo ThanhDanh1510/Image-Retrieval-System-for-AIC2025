@@ -12,7 +12,7 @@ export default function ResultsGrid({ results }) {
     const fetchData = async () => {
       try {
         const [ytRes, fpsRes] = await Promise.all([
-          fetch("/metadata/youtube_links.json"),
+          fetch("/metadata/youtube_links_all.json"),
           fetch("/metadata/batch1_fps.json"),
         ]);
         if (!ytRes.ok || !fpsRes.ok) throw new Error("Failed to load JSON files");

@@ -9,11 +9,25 @@ ROOT_DIR = os.path.abspath(
     )
 )
 
+# Helper ở cấp module: chọn tiền tố theo group_num
+def _prefix_from_group(group_num) -> str:
+    """
+    Trả về 'K' nếu group_num <= 20, ngược lại 'L'.
+    Tự ép kiểu sang int để an toàn khi group_num là chuỗi số.
+    """
+    try:
+        g = int(group_num)
+    except (TypeError, ValueError):
+        # Nếu không ép được, mặc định 'L' (đặt lớn hơn 20)
+        g = 999999
+    return 'K' if g <= 20 else 'L'
+
 sys.path.insert(0, ROOT_DIR)
 
 from service import ModelService, KeyframeQueryService
 from schema.response import KeyframeServiceReponse
 from config import DATA_FOLDER_PATH, API_BASE_URL
+
 
 class QueryController:
     def __init__(
@@ -38,9 +52,14 @@ class QueryController:
         model: KeyframeServiceReponse
     ) -> tuple[str, float]:
         """Convert KeyframeServiceReponse object thành path và score"""
+        prefix = _prefix_from_group(model.group_num)
+        # Ép kiểu về int để đảm bảo đúng định dạng và tránh lỗi
+        g = int(model.group_num)
+        v = int(model.video_num)
+        kf = int(model.keyframe_num)
         path = os.path.join(
             self.data_folder,
-            f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num}.webp"
+            f"{prefix}{g}/V{v:03d}/{kf}.webp"
         )
         return path, model.confidence_score
 
@@ -50,11 +69,14 @@ class QueryController:
         return f"{self.base_url}/images/{normalized_path}"
 
     def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
-        relative_path = f"L{model.group_num}/V{model.video_num:03d}/{model.keyframe_num}.webp"
-        video_name = f"L{model.group_num}_V{model.video_num:03d}"
-        name_img = str(model.keyframe_num)
+        prefix = _prefix_from_group(model.group_num)
+        g = int(model.group_num)
+        v = int(model.video_num)
+        kf = int(model.keyframe_num)
+        relative_path = f"{prefix}{g}/V{v:03d}/{kf}.webp"
+        video_name = f"{prefix}{g}_V{v:03d}"
+        name_img = str(kf)
         path = self.get_image_url(relative_path)
-
         return {
             "path": path,
             "video_name": video_name,
@@ -81,14 +103,13 @@ class QueryController:
     ):
         exclude_ids = [
             int(k) for k, v in self.id2index.items()
-            if v.split('/')[0] in list_group_exclude  # so sánh chuỗi -> chuỗi
+            if v.split('/') in list_group_exclude  # so sánh chuỗi -> chuỗi
         ]
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
         return raw_result
-
 
     async def search_with_selected_video_group(
         self,
@@ -106,7 +127,7 @@ class QueryController:
         if len(include_groups_set) > 0 and len(include_videos_set) == 0:
             exclude_ids = [
                 int(k) for k, v in self.id2index.items()
-                if v.split('/')[0] not in include_groups_set
+                if v.split('/') not in include_groups_set
             ]
         elif len(include_groups_set) == 0 and len(include_videos_set) > 0:
             exclude_ids = [
@@ -118,7 +139,7 @@ class QueryController:
         else:
             exclude_ids = [
                 int(k) for k, v in self.id2index.items()
-                if (v.split('/')[0] not in include_groups_set or int(v.split('/')[1]) not in include_videos_set)
+                if (v.split('/') not in include_groups_set or int(v.split('/')[1]) not in include_videos_set)
             ]
 
         embedding = self.model_service.embedding(query)
