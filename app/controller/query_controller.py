@@ -11,16 +11,23 @@ ROOT_DIR = os.path.abspath(
 
 # Helper ở cấp module: chọn tiền tố theo group_num
 def _prefix_from_group(group_num) -> str:
-    """
-    Trả về 'K' nếu group_num <= 20, ngược lại 'L'.
-    Tự ép kiểu sang int để an toàn khi group_num là chuỗi số.
-    """
     try:
         g = int(group_num)
     except (TypeError, ValueError):
-        # Nếu không ép được, mặc định 'L' (đặt lớn hơn 20)
+        # Nếu không ép được thì mặc định 'L'
         g = 999999
-    return 'K' if g <= 20 else 'L'
+
+    if g <= 9:
+        return "K0"
+    elif g <= 20:
+        return "K"
+    else:
+        return "L"
+
+def _normalize_group_token(group_token: str) -> str:
+    # Lấy các chữ số trong token, ví dụ "K03" -> "03" -> "3"; nếu đã là "21" -> "21"
+    digits = ''.join(ch for ch in group_token if ch.isdigit())
+    return str(int(digits)) if digits else group_token
 
 sys.path.insert(0, ROOT_DIR)
 
@@ -59,9 +66,10 @@ class QueryController:
         kf = int(model.keyframe_num)
         path = os.path.join(
             self.data_folder,
-            f"{prefix}{g}/V{v:03d}/{kf}.webp"
+            f"{prefix}{g:01d}/V{v:03d}/{kf}.webp"
         )
         return path, model.confidence_score
+
 
     def get_image_url(self, relative_path: str) -> str:
         """Convert relative path thành HTTP URL"""
@@ -99,48 +107,56 @@ class QueryController:
         query: str,
         top_k: int,
         score_threshold: float,
-        list_group_exclude: list[str]  # đã chuẩn hóa sang str từ schema
+        list_group_exclude: list[str]
     ):
-        exclude_ids = [
-            int(k) for k, v in self.id2index.items()
-            if v.split('/') in list_group_exclude  # so sánh chuỗi -> chuỗi
-        ]
+        # Chuẩn hóa nhóm về chuỗi số không leading zero (vd "022"->"22")
+        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_group_exclude}
+
+        # Lấy trực tiếp tất cả key thuộc các group cần loại trừ từ Mongo
+        repo = self.keyframe_service.keyframe_mongo_repo
+        docs = await repo.find({"group_num": {"$in": list(groups)}})
+        exclude_ids = [d.key for d in docs]
+
+        # Milvus search với expr: id not in exclude_ids
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
         return raw_result
 
+
     async def search_with_selected_video_group(
         self,
         query: str,
         top_k: int,
         score_threshold: float,
-        list_of_include_groups: list[str],  # đã chuẩn hóa
+        list_of_include_groups: list[str],
         list_of_include_videos: list[int]
     ):
-        exclude_ids = None
+        # Chuẩn hóa group về chuỗi số không leading zero (vd "L22" -> "22", "003" -> "3")
+        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_of_include_groups}
+        videos = set(list_of_include_videos)
 
-        include_groups_set = set(list_of_include_groups)
-        include_videos_set = set(list_of_include_videos)
+        repo = self.keyframe_service.keyframe_mongo_repo
 
-        if len(include_groups_set) > 0 and len(include_videos_set) == 0:
-            exclude_ids = [
-                int(k) for k, v in self.id2index.items()
-                if v.split('/') not in include_groups_set
-            ]
-        elif len(include_groups_set) == 0 and len(include_videos_set) > 0:
-            exclude_ids = [
-                int(k) for k, v in self.id2index.items()
-                if int(v.split('/')[1]) not in include_videos_set
-            ]
-        elif len(include_groups_set) == 0 and len(include_videos_set) == 0:
+        if not groups and not videos:
             exclude_ids = []
         else:
-            exclude_ids = [
-                int(k) for k, v in self.id2index.items()
-                if (v.split('/') not in include_groups_set or int(v.split('/')[1]) not in include_videos_set)
-            ]
+            # Xây filter dict hợp lệ cho Beanie/PyMongo (AND mặc định giữa các trường)
+            filt = {}
+            if groups:
+                filt["group_num"] = {"$in": list(groups)}
+            if videos:
+                filt["video_num"] = {"$in": list(videos)}
+
+            # Lấy id được phép
+            allowed_docs = await repo.find(filt)
+            allowed_ids = {d.key for d in allowed_docs}
+
+            # Lấy tất cả id rồi trừ đi allowed -> exclude (để Milvus chỉ trả trong tập allowed)
+            all_docs = await repo.get_all()
+            all_ids = {d.key for d in all_docs}
+            exclude_ids = list(all_ids - allowed_ids)
 
         embedding = self.model_service.embedding(query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
