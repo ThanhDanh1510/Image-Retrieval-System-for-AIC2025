@@ -36,7 +36,7 @@ class KeyframeRepository(MongoBaseRepository[Keyframe]):
         ]
 
     async def get_keyframe_by_video_num(
-        self, 
+        self,
         video_num: int,
     ):
         result = await self.find({"video_num": video_num})
@@ -50,7 +50,7 @@ class KeyframeRepository(MongoBaseRepository[Keyframe]):
         ]
 
     async def get_keyframe_by_keyframe_num(
-        self, 
+        self,
         keyframe_num: int,
     ):
         result = await self.find({"keyframe_num": keyframe_num})
@@ -61,6 +61,22 @@ class KeyframeRepository(MongoBaseRepository[Keyframe]):
                 group_num=keyframe.group_num,
                 keyframe_num=keyframe.keyframe_num
             ) for keyframe in result
-        ]   
+        ]
 
-
+    async def get_metadata_for_video(
+        self,
+        video_num: int,
+    ) -> KeyframeInterface | None:
+        """
+        Lấy metadata (như group_num) cho một video,
+        chỉ cần lấy 1 keyframe đại diện là đủ.
+        """
+        result = await self.find_one({"video_num": video_num})
+        if result:
+            return KeyframeInterface(
+                key=result.key,
+                video_num=result.video_num,
+                group_num=result.group_num,
+                keyframe_num=result.keyframe_num
+            )
+        return None

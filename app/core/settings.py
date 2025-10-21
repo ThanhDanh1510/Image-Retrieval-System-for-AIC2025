@@ -20,7 +20,7 @@ class MongoDBSettings(BaseSettings):
 
 
 class IndexPathSettings(BaseSettings):
-    FAISS_INDEX_PATH: str | None  
+    FAISS_INDEX_PATH: str | None
     USEARCH_INDEX_PATH: str | None
 
 
@@ -41,4 +41,7 @@ class KeyFrameIndexMilvusSetting(BaseSettings):
 class AppSettings(BaseSettings):
     DATA_FOLDER: str = str(BASE_DIR / "images")
     ID2INDEX_PATH: str = str(BASE_DIR / "embeddings" / "keyframe.json")
+    MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"
+    VIDEO_RANGES_PATH: str = str(BASE_DIR / "embeddings" / "video_index_ranges.json")
+    DP_PENALTY_WEIGHT: float = 0.005
     MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"

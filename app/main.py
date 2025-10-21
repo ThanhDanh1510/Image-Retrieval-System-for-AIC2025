@@ -12,10 +12,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 from router import keyframe_api
 from core.lifespan import lifespan
 from core.logger import SimpleLogger
+from router import video_api # <-- THÊM MỚI
 
 logger = SimpleLogger(__name__)
 
-IMAGES_DIR = os.getenv("IMAGES_DIR", 
+IMAGES_DIR = os.getenv("IMAGES_DIR",
     os.path.join(os.path.dirname(__file__), "..", "images"))
 
 
@@ -29,7 +30,7 @@ class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Methods"] = "GET"
             response.headers["Access-Control-Allow-Headers"] = "*"
         return response
-    
+
 app = FastAPI(
     title="Keyframe Search API",
     description="""
@@ -80,7 +81,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,6 +90,7 @@ app.add_middleware(
 app.add_middleware(CORSStaticFilesMiddleware)
 # Include API routes
 app.include_router(keyframe_api.router, prefix="/api/v1")
+app.include_router(video_api.router, prefix="/api/v1") # <-- THÊM MỚI
 
 # 🔹 Mount static files với error handling
 try:
@@ -101,7 +103,7 @@ try:
         # Tìm kiếm trong các vị trí có thể
         possible_paths = [
             "../images",
-            "../../images", 
+            "../../images",
             "./images",
             os.path.join(os.path.dirname(__file__), "..", "images")
         ]
@@ -189,7 +191,7 @@ async def mount_status():
     """Kiểm tra trạng thái mount và sample file"""
     sample_path = "L06/V013/00015158.webp"
     full_path = os.path.join(IMAGES_DIR, sample_path)
-    
+
     return {
         "images_dir": IMAGES_DIR,
         "images_dir_exists": os.path.exists(IMAGES_DIR),
@@ -210,7 +212,7 @@ async def check_file_permissions(path: str):
         "full_path": full_path,
         "exists": os.path.exists(full_path)
     }
-    
+
     if os.path.exists(full_path):
         try:
             # Thử đọc file
@@ -220,21 +222,21 @@ async def check_file_permissions(path: str):
         except Exception as e:
             result["readable"] = False
             result["read_error"] = str(e)
-    
+
     return result
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # 🔹 Thêm startup message
     logger.info("Starting Keyframe Search API...")
     logger.info(f"Images directory: {IMAGES_DIR}")
-    
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,  
+        reload=True,
         log_level="info"
     )
