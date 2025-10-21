@@ -44,3 +44,4 @@ class AppSettings(BaseSettings):
     MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"
     VIDEO_RANGES_PATH: str = str(BASE_DIR / "embeddings" / "video_index_ranges.json")
     DP_PENALTY_WEIGHT: float = 0.005
+    MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"
