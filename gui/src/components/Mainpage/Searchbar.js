@@ -10,6 +10,7 @@ const MODE_OPTIONS = [
   { key: "Default", label: "Default" },
   { key: "Exclude Groups", label: "Exclude Groups" },
   { key: "Include Groups & Videos", label: "Include Groups & Videos" },
+  { key: "TRAKE", label: "TRAKE"}
 ];
 
 export default function SearchBarIconMode({ onSubmit, initialMode = "Default" }) {
@@ -120,7 +121,7 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
                           active
                             ? "bg-blue-50 dark:bg-gray-700"
                             : "bg-transparent"
-                        } ${mode === m.key ? "font-semibold" : ""} 
+                        } ${mode === m.key ? "font-semibold" : ""}
                         text-gray-800 dark:text-gray-100`}
                         onClick={(e) => {
                           setMode(m.key);
@@ -196,7 +197,7 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
         </div>
       </div>
 
-      
+
       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
         <div>
           Mode: <span className="font-medium">{mode}</span>

@@ -49,21 +49,22 @@ router = APIRouter(
     """,
     response_description="List of matching keyframes with confidence scores"
 )
+
 async def search_keyframes(
     request: TextSearchRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
     """Search for keyframes using text query with semantic similarity."""
     logger.info(f"Text search request: query='{request.query}', top_k={request.top_k}, threshold={request.score_threshold}")
-    
+
     results = await controller.search_text(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold
     )
-    
+
     logger.info(f"Found {len(results)} results for query: '{request.query}'")
-    
+
     # Sử dụng convert_to_display_result
     display_results = []
     for result in results:
@@ -74,7 +75,7 @@ async def search_keyframes(
             video_name=display_data["video_name"],
             name_img=display_data["name_img"]
         ))
-    
+
     return KeyframeDisplay(results=display_results)
 
 @router.post(
@@ -84,7 +85,7 @@ async def search_keyframes(
     description="""
     Perform text-based search for keyframes while excluding specific groups.
     Groups can be specified as integers or strings - they will be automatically converted to strings.
-    
+
     **Example:**
     ```
     {
@@ -103,16 +104,16 @@ async def search_keyframes_exclude_groups(
 ):
     """Search for keyframes with group exclusion filtering."""
     logger.info(f"Text search with group exclusion: query='{request.query}', exclude_groups={request.exclude_groups}")
-    
+
     results = await controller.search_text_with_exclude_group(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
         list_group_exclude=request.exclude_groups  # Đã được convert thành str bởi validator
     )
-    
+
     logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")
-    
+
     display_results = []
     for result in results:
         display_data = controller.convert_to_display_result(result)
@@ -120,9 +121,9 @@ async def search_keyframes_exclude_groups(
             path=display_data["path"],
             score=display_data["score"],
             video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
-            name_img=display_data.get("name_img", "")   
+            name_img=display_data.get("name_img", "")
         ))
-    
+
     return KeyframeDisplay(results=display_results)
 
 @router.post(
@@ -133,7 +134,7 @@ async def search_keyframes_exclude_groups(
     Perform text-based search for keyframes within specific groups and videos only.
     Groups can be specified as integers or strings - they will be automatically converted to strings.
     Videos remain as integers.
-    
+
     **Example:**
     ```
     {
@@ -153,7 +154,7 @@ async def search_keyframes_selected_groups_videos(
 ):
     """Search for keyframes within selected groups and videos."""
     logger.info(f"Text search with selection: query='{request.query}', include_groups={request.include_groups}, include_videos={request.include_videos}")
-    
+
     results = await controller.search_with_selected_video_group(
         query=request.query,
         top_k=request.top_k,
@@ -161,9 +162,9 @@ async def search_keyframes_selected_groups_videos(
         list_of_include_groups=request.include_groups,  # Đã được convert thành str bởi validator
         list_of_include_videos=request.include_videos   # Giữ nguyên int
     )
-    
+
     logger.info(f"Found {len(results)} results within selected groups/videos")
-    
+
     display_results = []
     for result in results:
         display_data = controller.convert_to_display_result(result)
@@ -171,7 +172,7 @@ async def search_keyframes_selected_groups_videos(
            path=display_data["path"],
             score=display_data["score"],
             video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
-            name_img=display_data.get("name_img", "")   
+            name_img=display_data.get("name_img", "")
         ))
-    
+
     return KeyframeDisplay(results=display_results)

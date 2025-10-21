@@ -12,15 +12,23 @@ ROOT_DIR = os.path.abspath(
 # Helper ở cấp module: chọn tiền tố theo group_num
 def _prefix_from_group(group_num) -> str:
     """
-    Trả về 'K' nếu group_num <= 20, ngược lại 'L'.
-    Tự ép kiểu sang int để an toàn khi group_num là chuỗi số.
+    Trả về tiền tố theo quy tắc:
+    - Nếu group_num <= 9: 'K0'
+    - Nếu 10 <= group_num <= 20: 'K'
+    - Nếu group_num > 20 hoặc không hợp lệ: 'L'
     """
     try:
         g = int(group_num)
     except (TypeError, ValueError):
-        # Nếu không ép được, mặc định 'L' (đặt lớn hơn 20)
+        # Nếu không ép được thì mặc định 'L'
         g = 999999
-    return 'K' if g <= 20 else 'L'
+
+    if g <= 9:
+        return "K0"
+    elif g <= 20:
+        return "K"
+    else:
+        return "L"
 
 sys.path.insert(0, ROOT_DIR)
 
