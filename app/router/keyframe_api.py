@@ -1,3 +1,5 @@
+# Project-relative path: app/router/keyframe_api.py
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from typing import List, Optional

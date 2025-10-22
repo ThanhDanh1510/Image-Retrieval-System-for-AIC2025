@@ -1,3 +1,4 @@
+# Project-relative path: app/factory/factory.py
 import os
 import sys
 from pathlib import Path # <-- THÊM IMPORT NÀY

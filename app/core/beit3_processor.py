@@ -1,3 +1,4 @@
+# Project-relative path: app/core/beit3_processor.py
 import torch
 from torchvision import transforms
 from transformers import XLMRobertaTokenizer

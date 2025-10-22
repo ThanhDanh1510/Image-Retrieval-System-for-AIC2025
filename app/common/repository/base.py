@@ -1,3 +1,4 @@
+# Project-relative path: app/common/repository/base.py
 from typing import TypeVar, Any, Generic, Type, List, Optional
 from abc import ABC, abstractmethod
 from beanie import Document 
@@ -54,7 +55,7 @@ class MilvusBaseRepository(ABC):
 
 
 
-    
-        
+
+
 
 

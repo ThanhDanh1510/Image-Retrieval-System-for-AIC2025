@@ -1,3 +1,4 @@
+# Project-relative path: app/service/model_service.py
 import torch
 import numpy as np
 from typing import List

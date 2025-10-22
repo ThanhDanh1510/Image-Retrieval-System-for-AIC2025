@@ -1,3 +1,4 @@
+# Project-relative path: app/router/video_api.py
 from fastapi import APIRouter, Depends
 from app.schema.ranking_schemas import VideoRankingRequest, VideoRankingResponse
 from app.controller.ranking_controller import RankingController

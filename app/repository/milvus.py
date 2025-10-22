@@ -1,3 +1,4 @@
+# Project-relative path: app/repository/milvus.py
 """
 The implementation of Vector Repository. The following class is responsible for getting the vector by many ways
 Including Faiss and Usearch

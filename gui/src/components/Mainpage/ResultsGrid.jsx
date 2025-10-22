@@ -2,11 +2,27 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import YoutubePlayerWithFrameCounter from "./YoutubePlayerWithFrameCounter";
 
-export default function ResultsGrid({ results }) {
+const parseInfoFromPath = (path) => {
+  if (!path) return { video_name: null, name_img: null };
+  const match = path.match(/(L\d{2}|K\d{2}|K0\d{1})\/(V\d{3})\/(\d+)\.webp$/);
+  
+  if (match) {
+    const [, group, video, img] = match;
+    return {
+      video_name: `${group}_${video}`,
+      name_img: img,
+    };
+  }
+  
+  console.warn("Không thể parse path:", path);
+  return { video_name: null, name_img: null };
+};
+
+export default function ResultsGrid({ results, mode }) {
   const [selectedResult, setSelectedResult] = useState(null);
   const [youtubeLinks, setYoutubeLinks] = useState({});
   const [fpsMap, setFpsMap] = useState({});
-  const [showVideo, setShowVideo] = useState(false); // trạng thái hiện video
+  const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,7 +45,7 @@ export default function ResultsGrid({ results }) {
 
   const openModal = (result, index) => {
     setSelectedResult({ ...result, index });
-    setShowVideo(false); // reset video ẩn khi mở modal khác
+    setShowVideo(false);
   };
 
   const closeModal = () => {
@@ -79,6 +95,7 @@ export default function ResultsGrid({ results }) {
   };
 
   const getVideoIdFromUrl = (url) => {
+    if (!url) return null;
     try {
       const urlObj = new URL(url);
       return urlObj.searchParams.get("v");
@@ -87,9 +104,72 @@ export default function ResultsGrid({ results }) {
     }
   };
 
-  return (
-    <>
-      {/* Grid ảnh */}
+  // 1. Khai báo một biến để chứa nội dung grid
+  let gridContent;
+
+  if (mode === "TRAKE") {
+    const sortedResults = results.slice().sort((a, b) => (b.dp_score ?? 0) - (a.dp_score ?? 0));
+    // 2. Gán nội dung grid TRAKE vào biến
+    gridContent = (
+      <div className="space-y-4">
+        {sortedResults.map((videoResult, idx) => (
+          <div
+            key={videoResult.video_id || idx}
+            className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
+          >
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3">
+              Video: {videoResult.video_id || `${videoResult.group_num}/${videoResult.video_num}`}
+              <span className="ml-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                Score: {Number(videoResult.dp_score ?? 0).toFixed(4)}
+              </span>
+            </h3>
+            
+            <div className="flex flex-row items-center gap-2 pb-2 overflow-x-auto">
+              {videoResult.aligned_key_paths && videoResult.aligned_key_paths.length > 0 ? (
+                videoResult.aligned_key_paths.map((path, imgIdx) => {
+                  const { video_name, name_img } = parseInfoFromPath(path);
+                  const modalData = {
+                    path: path,
+                    score: videoResult.dp_score,
+                    video_name: video_name,
+                    name_img: name_img,
+                  };
+                  
+                  return (
+                    <div 
+                      key={imgIdx} 
+                      className="relative flex-shrink-0 cursor-pointer group"
+                      onClick={() => openModal(modalData, `Video ${idx + 1} - Ảnh ${imgIdx + 1}`)}
+                      title={`Video: ${video_name}, Image: ${name_img}`}
+                    >
+                      <img
+                        src={getImageSrc(path)}
+                        alt={`Aligned keyframe ${imgIdx + 1} for video ${videoResult.video_id}`}
+                        className="h-36 w-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 group-hover:scale-110 transition-transform duration-200"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "";
+                        }}
+                      />
+                      <div className="absolute bottom-1 left-1 bg-black/50 text-white px-1 py-0.5 rounded text-xs font-mono">
+                        {name_img}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">
+                  No aligned keyframes found for this video.
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else {
+    // 3. Gán nội dung grid Default vào biến
+    gridContent = (
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
         {results
           .slice()
@@ -123,8 +203,16 @@ export default function ResultsGrid({ results }) {
             </div>
           ))}
       </div>
+    );
+  }
 
-      {/* Modal chi tiết */}
+  // 4. Return chung, chứa gridContent và Modal
+  return (
+    <>
+      {/* Hiển thị bất kỳ grid nào đã được gán */}
+      {gridContent}
+
+      {/* Modal chi tiết (luôn luôn có sẵn trong DOM khi selectedResult tồn tại) */}
       {selectedResult && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
@@ -156,7 +244,6 @@ export default function ResultsGrid({ results }) {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6 mb-6">
-                {/* Ảnh keyframe */}
                 <div className="flex justify-center">
                   {selectedResult.path ? (
                     <img
@@ -176,7 +263,6 @@ export default function ResultsGrid({ results }) {
                   )}
                 </div>
 
-                {/* Thông tin video và nút play */}
                 <div className="flex flex-col items-center justify-center">
                   <div className="mb-4 w-full">
                     <label className="block text-sm font-semibold mb-1">Video Name</label>
@@ -203,7 +289,6 @@ export default function ResultsGrid({ results }) {
                 </div>
               </div>
 
-              {/* Hiển thị video YouTube iframe và frame counter khi bật */}
               {showVideo && (
                 <div className="flex justify-center">
                   {youtubeLinks[selectedResult.video_name] ? (

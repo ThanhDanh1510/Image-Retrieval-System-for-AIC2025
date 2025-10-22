@@ -1,3 +1,5 @@
+# Project-relative path: app/core/dependencies.py
+
 import sys
 import os
 

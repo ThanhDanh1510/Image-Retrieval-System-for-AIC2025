@@ -17,37 +17,63 @@ function App() {
   const defaultApiUrl = "http://localhost:8000";
   const [apiUrl, setApiUrl] = useState(defaultApiUrl);
 
+  // 🔹 THÊM MỚI: Lưu lại mode của lần search cuối
+  const [lastSearchMode, setLastSearchMode] = useState("Default");
+
   const parseIds = (str) =>
     str.split(",").map((s) => s.trim()).filter(Boolean).map(Number);
 
-  const handleSearch = async (query, mode, extras) => {
-    if (!query.trim()) {
+  // 🔹 SỬA ĐỔI: 'query' giờ có thể là string (query) hoặc string[] (events)
+  const handleSearch = async (queryOrEvents, mode, extras) => {
+    
+    // 🔹 SỬA ĐỔI: Validate cho TRAKE
+    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && !queryOrEvents.trim()) {
       window.alert("Please enter a search query");
       return;
     }
-    if (query.length > 1000) {
+    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && queryOrEvents.length > 1000) {
       window.alert("Query too long. Please keep it under 1000 characters.");
       return;
     }
+    // (Validation cho TRAKE đã được xử lý trong Searchbar.js)
 
     setLoading(true);
 
     let endpoint = "";
-    let payload = {
-      query,
-      top_k: extras.top_k ?? 10,
-      score_threshold: extras.score_threshold ?? 0.0,
-    };
+    let payload = {};
 
-    if (mode === "Default") {
+    // 🔹 SỬA ĐỔI: Thêm logic cho TRAKE
+    if (mode === "TRAKE") {
+      endpoint = `${apiUrl}/api/v1/video/rank-by-events`;
+      payload = {
+        events: queryOrEvents, // Đây là một mảng string
+        top_k: extras.top_k ?? 10,
+        penalty_weight: extras.penalty_weight ?? 0.5
+      };
+    } else if (mode === "Default") {
       endpoint = `${apiUrl}/api/v1/keyframe/search`;
+      payload = {
+        query: queryOrEvents, // Đây là một string
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+      };
     } else if (mode === "Exclude Groups") {
       endpoint = `${apiUrl}/api/v1/keyframe/search/exclude-groups`;
-      payload.exclude_groups = extras.exclude_groups || [];
+      payload = {
+        query: queryOrEvents,
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+        exclude_groups: extras.exclude_groups || [],
+      };
     } else if (mode === "Include Groups & Videos") {
       endpoint = `${apiUrl}/api/v1/keyframe/search/selected-groups-videos`;
-      payload.include_groups = extras.include_groups || [];
-      payload.include_videos = extras.include_videos || [];
+      payload = {
+        query: queryOrEvents,
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+        include_groups: extras.include_groups || [],
+        include_videos: extras.include_videos || [],
+      };
     }
 
     try {
@@ -59,6 +85,7 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setResults(data.results || []);
+        setLastSearchMode(mode); // 🔹 CẬP NHẬT: Lưu lại mode
       } else {
         window.alert(`API Error: ${res.status} - ${await res.text()}`);
       }
@@ -72,10 +99,10 @@ function App() {
 
 
   const avgScore = results.length
-    ? (results.reduce((a, b) => a + b.score, 0) / results.length).toFixed(3)
+    ? (results.reduce((a, b) => a + (b.score ?? b.dp_score ?? 0), 0) / results.length).toFixed(3)
     : "-";
   const maxScore = results.length
-    ? Math.max(...results.map((r) => r.score)).toFixed(3)
+    ? Math.max(...results.map((r) => r.score ?? r.dp_score ?? 0)).toFixed(3)
     : "-";
 
   return (
@@ -96,7 +123,8 @@ function App() {
 
             {results.length > 0 && (
               <div className="mt-4">
-                <ResultsGrid results={results} />
+                {/* 🔹 SỬA ĐỔI: Truyền 'mode' vào ResultsGrid */}
+                <ResultsGrid results={results} mode={lastSearchMode} />
               </div>
             )}
           </div>

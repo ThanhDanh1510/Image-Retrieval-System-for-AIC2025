@@ -1,3 +1,4 @@
+# Project-relative path: app/core/lifespan.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -71,8 +72,8 @@ async def lifespan(app: FastAPI):
             milvus_user="",
             milvus_password="",
             milvus_search_params=milvus_search_params,
-            model_checkpoint=r"D:\AIO 2025\HCMC AIC\danh\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",
-            tokenizer_checkpoint=r"D:\AIO 2025\HCMC AIC\danh\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",
+            model_checkpoint=r"D:\data\beit3_large_patch16_384_f30k_retrieval.pth",
+            tokenizer_checkpoint=r"D:\data\beit3.spm",
             app_settings=appsetting, # Truyền app_settings vào đây
             mongo_collection=Keyframe
         )

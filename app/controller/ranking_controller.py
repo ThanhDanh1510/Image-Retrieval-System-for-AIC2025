@@ -1,3 +1,4 @@
+# Project-relative path: app/controller/ranking_controller.py
 import json
 from pathlib import Path
 from typing import List
@@ -53,7 +54,7 @@ class RankingController:
 
             # 1. Tạo cấu trúc thư mục đúng: K19/V027
             prefix = _prefix_from_group(group)
-            group_folder = f"{prefix}{int(group):02d}"
+            group_folder = f"{prefix}{int(group)}"
             video_folder = f"V{int(video):03d}"
 
             # 2. Tạo tên file ảnh từ keyframe_num (đã được pad 8 chữ số)
