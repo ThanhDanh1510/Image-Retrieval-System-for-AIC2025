@@ -1,3 +1,4 @@
+# Project-relative path: app/controller/query_controller.py
 from pathlib import Path
 import json
 import os
@@ -11,6 +12,12 @@ ROOT_DIR = os.path.abspath(
 
 # Helper ở cấp module: chọn tiền tố theo group_num
 def _prefix_from_group(group_num) -> str:
+    """
+    Trả về tiền tố theo quy tắc:
+    - Nếu group_num <= 9: 'K0'
+    - Nếu 10 <= group_num <= 20: 'K'
+    - Nếu group_num > 20 hoặc không hợp lệ: 'L'
+    """
     try:
         g = int(group_num)
     except (TypeError, ValueError):

@@ -1,3 +1,4 @@
+# Project-relative path: app/schema/response.py
 from pydantic import BaseModel, Field
 
 

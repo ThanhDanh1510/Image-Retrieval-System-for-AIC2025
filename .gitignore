@@ -233,3 +233,4 @@ embeddings/
 beit3.spm
 beit3_large_itc_patch16_224.pth
 beit3_large_patch16_384_f30k_retrieval.pth
+ASR-json/

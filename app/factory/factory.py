@@ -1,5 +1,8 @@
+# Project-relative path: app/factory/factory.py
 import os
 import sys
+from pathlib import Path # <-- THÊM IMPORT NÀY
+
 ROOT_DIR = os.path.abspath(
     os.path.join(
         os.path.dirname(__file__), '../'
@@ -22,6 +25,10 @@ from typing import Optional  # NEW
 from core.settings import AppSettings  # NEW
 from service.query_rewrite_service import QueryRewriteService  # NEW
 
+from service import KeyframeQueryService, ModelService, VideoRankingService # Thêm VideoRankingService
+from controller.query_controller import QueryController
+from controller.ranking_controller import RankingController # Thêm RankingController
+from core.settings import AppSettings # Thêm AppSettings
 
 class ServiceFactory:
     def __init__(
@@ -34,9 +41,10 @@ class ServiceFactory:
         milvus_search_params: dict,
         model_checkpoint: str,
         tokenizer_checkpoint: str,
+        app_settings: AppSettings, # Thêm app_settings,
         milvus_db_name: str = "default",
         milvus_alias: str = "default",
-        mongo_collection=Keyframe,
+        mongo_collection=Keyframe
     ):
         self._mongo_keyframe_repo = KeyframeRepository(collection=mongo_collection)
         self._milvus_keyframe_repo = self._init_milvus_repo(
@@ -81,6 +89,27 @@ class ServiceFactory:
             # Giữ nguyên hành vi cũ nếu thiếu config/lỗi khởi tạo  # NEW
             self._query_rewrite_service = None  # NEW
         # NEW --- end Query Rewrite wiring ---
+        # --- THÊM MỚI ---
+        # Service mới dùng chung repo và model
+        self._video_ranking_service = VideoRankingService(
+            model_service=self._model_service,
+            vector_repo=self._milvus_keyframe_repo,
+            keyframe_repo=self._mongo_keyframe_repo,
+            settings=app_settings # Truyền AppSettings
+        )
+        # Controller mới
+        self._ranking_controller = RankingController(
+            ranking_service=self._video_ranking_service,
+            id2index_path=Path(app_settings.ID2INDEX_PATH)
+        )
+
+        # Controller cũ (cần AppSettings)
+        self._query_controller = QueryController(
+            data_folder=Path(app_settings.DATA_FOLDER),
+            id2index_path=Path(app_settings.ID2INDEX_PATH),
+            model_service=self._model_service,
+            keyframe_service=self._keyframe_query_service
+        )
 
     def _init_milvus_repo(
         self,
@@ -132,3 +161,14 @@ class ServiceFactory:
     # NEW
     def get_query_rewrite_service(self):
         return self._query_rewrite_service
+    # --- THÊM MỚI ---
+    def get_video_ranking_service(self):
+        return self._video_ranking_service
+
+    def get_ranking_controller(self):
+        return self._ranking_controller
+
+    # --- THÊM MỚI (hoặc di dời logic từ dependencies.py) ---
+    # Tốt hơn là nên để Factory tạo luôn Controller
+    def get_query_controller(self):
+        return self._query_controller

@@ -1,3 +1,4 @@
+# Project-relative path: app/core/settings.py
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from pathlib import Path
@@ -20,7 +21,7 @@ class MongoDBSettings(BaseSettings):
 
 
 class IndexPathSettings(BaseSettings):
-    FAISS_INDEX_PATH: str | None  
+    FAISS_INDEX_PATH: str | None
     USEARCH_INDEX_PATH: str | None
 
 
@@ -51,3 +52,6 @@ class AppSettings(BaseSettings):
     # NEW: API key (tuỳ provider dùng cái nào thì set env cái đó)
     OPENAI_API_KEY: Optional[str] = None            # NEW
     GEMINI_API_KEY: Optional[str] = None            # NEW
+    VIDEO_RANGES_PATH: str = str(BASE_DIR / "embeddings" / "video_index_ranges.json")
+    DP_PENALTY_WEIGHT: float = 0.005
+    MODEL_NAME: str = "hf-hub:microsoft/beit-large-patch16-224-pt22k-ft22k"
