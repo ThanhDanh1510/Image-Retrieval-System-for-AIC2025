@@ -66,14 +66,30 @@ async def lifespan(app: FastAPI):
             milvus_user="",  
             milvus_password="",  
             milvus_search_params=milvus_search_params,
-            model_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
-            tokenizer_checkpoint=r"D:\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",  # Thay bằng đường dẫn thực tế
+            model_checkpoint=r"/Users/tranducthien/Documents/AIC2025/Image-Retrieval-System-for-AIC2025/beit3/beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
+            tokenizer_checkpoint=r"/Users/tranducthien/Documents/AIC2025/Image-Retrieval-System-for-AIC2025/beit3/beit3.spm",  # Thay bằng đường dẫn thực tế
             mongo_collection=Keyframe
         )
         logger.info("Service factory initialized successfully")
         
         app.state.service_factory = service_factory
         app.state.mongo_client = mongo_client
+
+        # NEW: expose AppSettings vào app.state cho các nơi khác (optional, không phá hành vi cũ)
+        try:
+            app.state.app_settings = appsetting  # NEW
+        except Exception:
+            pass  # NEW
+
+        # NEW: log tình trạng Query Rewrite để dễ debug (không ảnh hưởng startup)
+        try:
+            if getattr(appsetting, "QUERY_REWRITE_ENABLED", False):  # NEW
+                provider = getattr(appsetting, "QUERY_REWRITE_PROVIDER", None)  # NEW
+                logger.info(f"Query rewrite is ENABLED (provider={provider})")  # NEW
+            else:
+                logger.info("Query rewrite is DISABLED")  # NEW
+        except Exception as _e:
+            logger.warning(f"Unable to read query rewrite settings: {_e}")  # NEW
         
         logger.info("Application startup completed successfully")
         
@@ -95,4 +111,3 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
-

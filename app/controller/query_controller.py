@@ -35,6 +35,10 @@ from service import ModelService, KeyframeQueryService
 from schema.response import KeyframeServiceReponse
 from config import DATA_FOLDER_PATH, API_BASE_URL
 
+# NEW
+from typing import Optional  # NEW
+# Không bắt buộc import type cụ thể để tránh phụ thuộc cứng.  # NEW
+
 
 class QueryController:
     def __init__(
@@ -43,7 +47,8 @@ class QueryController:
         id2index_path: Path,
         model_service: ModelService,
         keyframe_service: KeyframeQueryService,
-        base_url: str = "http://localhost:8000"
+        base_url: str = "http://localhost:8000",
+        rewrite_service: Optional[object] = None,  # NEW: optional injection
     ):
         self.data_folder = DATA_FOLDER_PATH
         self.id2index = json.load(open(id2index_path, 'r'))
@@ -53,6 +58,32 @@ class QueryController:
         self.model_service = model_service
         self.keyframe_service = keyframe_service
         self.base_url = API_BASE_URL
+
+        self._rewrite_service = rewrite_service  # NEW
+
+    # NEW: helper để rewrite có kiểm soát/fallback
+    def _rewrite_if_needed(
+        self,
+        query: str,
+        rewrite: bool = False,
+        rewrite_provider: Optional[str] = None
+    ) -> str:
+        """
+        Nếu rewrite=True và có rewrite_service thì rewrite query.
+        Bất kỳ lỗi/case không phù hợp -> trả lại query gốc (fail-open).
+        rewrite_provider chỉ là gợi ý, implementation hiện tại dùng provider đã cấu hình trong service.
+        """
+        if not rewrite:
+            return query
+        svc = getattr(self, "_rewrite_service", None)
+        if svc is None:
+            return query
+        try:
+            # Nếu service hỗ trợ set provider động thì có thể dùng rewrite_provider ở đây.
+            # Hiện tại service đã cố định provider theo config -> chỉ gọi rewrite(query).
+            return svc.rewrite(query)  # type: ignore[attr-defined]
+        except Exception:
+            return query
 
     def convert_model_to_path(
         self,
@@ -96,18 +127,49 @@ class QueryController:
         self,
         query: str,
         top_k: int,
-        score_threshold: float
+        score_threshold: float,
+        rewrite: bool = False,                    # NEW: tùy chọn, mặc định False
+        rewrite_provider: Optional[str] = None,   # NEW: tùy chọn
     ):
-        embedding = self.model_service.embedding(query)
-        raw_result = await self.keyframe_service.search_by_text(embedding, top_k, score_threshold)
+        """
+        Thực hiện tìm kiếm text — nếu rewrite bật, query sẽ được rewrite trước khi embed.
+        """
+    # --- Rewrite query (nếu được bật) ---
+        effective_query = self._rewrite_if_needed(
+            query,
+            rewrite=rewrite,
+            rewrite_provider=rewrite_provider,
+        )
+
+    # Log rõ ràng phần rewrite để bạn thấy câu mới
+        if effective_query != query:
+            from core.logger import SimpleLogger
+            SimpleLogger(__name__).info(
+                f"[QueryRewrite] '{query}' -> '{effective_query}'"
+            )
+        else:
+            from core.logger import SimpleLogger
+            SimpleLogger(__name__).info(
+                f"[QueryRewrite] No rewrite applied (using original query: '{query}')"
+            )
+
+    # --- Embedding & search ---
+        embedding = self.model_service.embedding(effective_query)
+        raw_result = await self.keyframe_service.search_by_text(
+            embedding, top_k, score_threshold
+        )
+
         return raw_result
+
 
     async def search_text_with_exclude_group(
         self,
         query: str,
         top_k: int,
         score_threshold: float,
-        list_group_exclude: list[str]
+        list_group_exclude: list[str],
+        rewrite: bool = False,                    # NEW
+        rewrite_provider: Optional[str] = None,   # NEW
     ):
         # Chuẩn hóa nhóm về chuỗi số không leading zero (vd "022"->"22")
         groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_group_exclude}
@@ -117,8 +179,11 @@ class QueryController:
         docs = await repo.find({"group_num": {"$in": list(groups)}})
         exclude_ids = [d.key for d in docs]
 
+        # NEW: rewrite trước khi embed (nếu bật)
+        effective_query = self._rewrite_if_needed(query, rewrite=rewrite, rewrite_provider=rewrite_provider)  # NEW
+
         # Milvus search với expr: id not in exclude_ids
-        embedding = self.model_service.embedding(query)
+        embedding = self.model_service.embedding(effective_query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )
@@ -131,7 +196,9 @@ class QueryController:
         top_k: int,
         score_threshold: float,
         list_of_include_groups: list[str],
-        list_of_include_videos: list[int]
+        list_of_include_videos: list[int],
+        rewrite: bool = False,                    # NEW
+        rewrite_provider: Optional[str] = None,   # NEW
     ):
         # Chuẩn hóa group về chuỗi số không leading zero (vd "L22" -> "22", "003" -> "3")
         groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_of_include_groups}
@@ -158,7 +225,10 @@ class QueryController:
             all_ids = {d.key for d in all_docs}
             exclude_ids = list(all_ids - allowed_ids)
 
-        embedding = self.model_service.embedding(query)
+        # NEW: rewrite trước khi embed (nếu bật)
+        effective_query = self._rewrite_if_needed(query, rewrite=rewrite, rewrite_provider=rewrite_provider)  # NEW
+
+        embedding = self.model_service.embedding(effective_query)
         raw_result = await self.keyframe_service.search_by_text_exclude_ids(
             embedding, top_k, score_threshold, exclude_ids
         )

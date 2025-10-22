@@ -17,6 +17,11 @@ from models.keyframe import Keyframe
 from core.beit3_processor import load_model_and_processor
 from pymilvus import connections, Collection as MilvusCollection
 
+# NEW: thêm import cho query rewrite
+from typing import Optional  # NEW
+from core.settings import AppSettings  # NEW
+from service.query_rewrite_service import QueryRewriteService  # NEW
+
 
 class ServiceFactory:
     def __init__(
@@ -51,6 +56,31 @@ class ServiceFactory:
             keyframe_mongo_repo=self._mongo_keyframe_repo,
             keyframe_vector_repo=self._milvus_keyframe_repo
         )
+
+        # NEW --- Query Rewrite wiring (optional, non-invasive) ---
+        self._query_rewrite_service: Optional[QueryRewriteService] = None  # NEW
+        try:  # NEW
+            _app_settings = AppSettings()  # NEW
+            if getattr(_app_settings, "QUERY_REWRITE_ENABLED", False):  # NEW
+                _provider = getattr(_app_settings, "QUERY_REWRITE_PROVIDER", None)  # NEW
+                _timeout_ms = int(getattr(_app_settings, "QUERY_REWRITE_TIMEOUT_MS", 12_000))  # NEW
+
+                _api_key: Optional[str] = None  # NEW
+                if _provider == "openai":  # NEW
+                    _api_key = getattr(_app_settings, "OPENAI_API_KEY", None)  # NEW
+                elif _provider == "gemini":  # NEW
+                    _api_key = getattr(_app_settings, "GEMINI_API_KEY", None)  # NEW
+
+                if _provider and _api_key:  # NEW
+                    self._query_rewrite_service = QueryRewriteService(  # NEW
+                        provider=_provider,
+                        api_key=_api_key,
+                        timeout_ms=_timeout_ms,
+                    )  # NEW
+        except Exception:  # NEW
+            # Giữ nguyên hành vi cũ nếu thiếu config/lỗi khởi tạo  # NEW
+            self._query_rewrite_service = None  # NEW
+        # NEW --- end Query Rewrite wiring ---
 
     def _init_milvus_repo(
         self,
@@ -98,3 +128,7 @@ class ServiceFactory:
 
     def get_keyframe_query_service(self):
         return self._keyframe_query_service
+
+    # NEW
+    def get_query_rewrite_service(self):
+        return self._query_rewrite_service

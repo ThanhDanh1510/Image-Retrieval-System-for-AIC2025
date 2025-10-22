@@ -1,6 +1,18 @@
+
 import torch
 import numpy as np
 from core.beit3_processor import load_model_and_processor, Processor
+
+def get_device():
+    if torch.backends.mps.is_available():
+        print("✅ Using Apple MPS (Metal Performance Shaders)")
+        return torch.device("mps")
+    elif torch.cuda.is_available():
+        print("✅ Using CUDA GPU")
+        return torch.device("cuda")
+    else:
+        print("⚙️ Using CPU")
+        return torch.device("cpu")
 
 
 class ModelService:
@@ -8,7 +20,7 @@ class ModelService:
         self,
         model_checkpoint: str,
         tokenizer_checkpoint: str,
-        device: str = 'cuda'
+        device = get_device(),
     ):
         self.device = device
         self.model, self.processor = load_model_and_processor(model_checkpoint, tokenizer_checkpoint)
