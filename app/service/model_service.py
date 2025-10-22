@@ -6,13 +6,24 @@ from typing import List
 # Import các hàm và lớp từ file beit3_processor.py của bạn
 from core.beit3_processor import load_model_and_processor, Processor
 
+def get_device():
+    if torch.backends.mps.is_available():
+        print("✅ Using Apple MPS (Metal Performance Shaders)")
+        return torch.device("mps")
+    elif torch.cuda.is_available():
+        print("✅ Using CUDA GPU")
+        return torch.device("cuda")
+    else:
+        print("⚙️ Using CPU")
+        return torch.device("cpu")
+
 
 class ModelService:
     def __init__(
         self,
         model_checkpoint: str,
         tokenizer_checkpoint: str,
-        device: str = 'cuda'
+        device = get_device(),
     ):
         """
         Khởi tạo ModelService.

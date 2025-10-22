@@ -54,15 +54,33 @@ router = APIRouter(
 
 async def search_keyframes(
     request: TextSearchRequest,
-    controller: QueryController = Depends(get_query_controller)
-):
+    controller: QueryController = Depends(get_query_controller),
+    http_req: Request = None,  # NEW
+): 
+    logger.info(f"Rewrite flag: {getattr(request,'rewrite', False)}, provider: {getattr(request,'rewrite_provider', None)}")
+    # if getattr(request, "rewrite", False):
+    #     try:
+    #         from core.dependencies import get_service_factory
+    #         sf = get_service_factory(http_req)           # dùng http_req (Request thật)
+    #         rw = sf.get_query_rewrite_service()
+    #         if rw:
+    #             rewritten = rw.rewrite(request.query)    # nhanh do có cache
+    #             logger.info(f"[Router Rewrite] {request.query!r} → {rewritten!r}")
+    #     except Exception as e:
+    #         logger.error(f"Failed to log rewrite: {e}")
+            
     """Search for keyframes using text query with semantic similarity."""
     logger.info(f"Text search request: query='{request.query}', top_k={request.top_k}, threshold={request.score_threshold}")
+    # NEW
+    logger.info(f"Rewrite flag: {getattr(request, 'rewrite', False)}, provider: {getattr(request, 'rewrite_provider', None)}")  # NEW
+    
 
     results = await controller.search_text(
         query=request.query,
         top_k=request.top_k,
-        score_threshold=request.score_threshold
+        score_threshold=request.score_threshold,
+        rewrite=getattr(request, "rewrite", False),                 # NEW
+        rewrite_provider=getattr(request, "rewrite_provider", None) # NEW
     )
 
     logger.info(f"Found {len(results)} results for query: '{request.query}'")
@@ -106,12 +124,17 @@ async def search_keyframes_exclude_groups(
 ):
     """Search for keyframes with group exclusion filtering."""
     logger.info(f"Text search with group exclusion: query='{request.query}', exclude_groups={request.exclude_groups}")
+    # NEW
+    logger.info(f"Rewrite flag: {getattr(request, 'rewrite', False)}, provider: {getattr(request, 'rewrite_provider', None)}")  # NEW
+    
 
     results = await controller.search_text_with_exclude_group(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
-        list_group_exclude=request.exclude_groups  # Đã được convert thành str bởi validator
+        list_group_exclude=request.exclude_groups,  # Đã được convert thành str bởi validator
+        rewrite=getattr(request, "rewrite", False),                 # NEW
+        rewrite_provider=getattr(request, "rewrite_provider", None) # NEW
     )
 
     logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")
@@ -156,13 +179,18 @@ async def search_keyframes_selected_groups_videos(
 ):
     """Search for keyframes within selected groups and videos."""
     logger.info(f"Text search with selection: query='{request.query}', include_groups={request.include_groups}, include_videos={request.include_videos}")
+    # NEW
+    logger.info(f"Rewrite flag: {getattr(request, 'rewrite', False)}, provider: {getattr(request, 'rewrite_provider', None)}")  # NEW
+    
 
     results = await controller.search_with_selected_video_group(
         query=request.query,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
-        list_of_include_groups=request.include_groups,  # Đã được convert thành str bởi validator
-        list_of_include_videos=request.include_videos   # Giữ nguyên int
+        list_of_include_groups=request.include_groups,   # Đã được convert thành str bởi validator
+        list_of_include_videos=request.include_videos,   # Giữ nguyên int
+        rewrite=getattr(request, "rewrite", False),                 # NEW
+        rewrite_provider=getattr(request, "rewrite_provider", None) # NEW
     )
 
     logger.info(f"Found {len(results)} results within selected groups/videos")

@@ -163,11 +163,31 @@ def get_milvus_repository(service_factory: ServiceFactory = Depends(get_service_
         )
 
 
+# NEW ---- Query Rewrite dependency (optional) ----
+from typing import Optional  # NEW
+from service.query_rewrite_service import QueryRewriteService  # NEW
+
+def get_query_rewrite_service_dep(  # NEW
+    service_factory: ServiceFactory = Depends(get_service_factory)  # NEW
+) -> Optional[QueryRewriteService]:  # NEW
+    """
+    Trả về QueryRewriteService nếu đã bật và khởi tạo,
+    ngược lại trả về None để controller tự fallback.  # NEW
+    """  # NEW
+    try:  # NEW
+        return service_factory.get_query_rewrite_service()  # NEW
+    except Exception as e:  # NEW
+        logger.warning(f"QueryRewriteService unavailable: {e}")  # NEW
+        return None  # NEW
+# NEW ---- end Query Rewrite dependency ----
+
+
 def get_query_controller(
     model_service: ModelService = Depends(get_model_service),
     keyframe_service: KeyframeQueryService = Depends(get_keyframe_service),
     milvus_settings: KeyFrameIndexMilvusSetting = Depends(get_milvus_settings),
-    app_settings: AppSettings = Depends(get_app_settings)
+    app_settings: AppSettings = Depends(get_app_settings),
+    rewrite_service: Optional[QueryRewriteService] = Depends(get_query_rewrite_service_dep),  # NEW
 ) -> QueryController:
     """Get query controller instance"""
     try:
@@ -190,7 +210,8 @@ def get_query_controller(
             data_folder=data_folder,
             id2index_path=id2index_path,
             model_service=model_service,
-            keyframe_service=keyframe_service
+            keyframe_service=keyframe_service,
+            rewrite_service=rewrite_service,  # NEW: optional injection
         )
 
         logger.info("Query controller created successfully")
