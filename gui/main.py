@@ -129,19 +129,6 @@ with col2:
         options=["Default", "Exclude Groups", "Include Groups & Videos"],
         help="Choose how to filter your search results"
     )
-    search_type = st.selectbox(
-    "Search Type",
-    options=["Semantic", "OCR"],
-    help="Choose between semantic similarity or OCR text search"
-)
-
-if search_type == "OCR":
-    if search_mode == "Default":
-        endpoint = f"{st.session_state.api_base_url}/api/v1/keyframe/search/ocr"
-    elif search_mode == "Exclude Groups":
-        endpoint = f"{st.session_state.api_base_url}/api/v1/keyframe/search/ocr/exclude-groups"
-    else:
-        endpoint = f"{st.session_state.api_base_url}/api/v1/keyframe/search/ocr/selected-groups-videos"
 
 # Mode-specific parameters
 if search_mode == "Exclude Groups":

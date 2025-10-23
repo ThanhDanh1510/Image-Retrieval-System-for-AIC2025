@@ -1,268 +1,120 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
-from typing import List, Optional
+# app/router/keyframe_api.py
+
+from fastapi import APIRouter, Depends, Path as FastAPIPath, Query, UploadFile, File, Form
+from typing import List
 
 from schema.request import (
     TextSearchRequest,
     TextSearchWithExcludeGroupsRequest,
     TextSearchWithSelectedGroupsAndVideosRequest,
 )
-
 from schema.response import KeyframeServiceReponse, SingleKeyframeDisplay, KeyframeDisplay
 from controller.query_controller import QueryController
 from core.dependencies import get_query_controller
 from core.logger import SimpleLogger
 
 logger = SimpleLogger(__name__)
+router = APIRouter(prefix="/keyframe", tags=["keyframe"])
 
-router = APIRouter(
-    prefix="/keyframe",
-    tags=["keyframe"],
-    responses={404: {"description": "Not found"}},
-)
+# --- Helper Function để tránh lặp code ---
+def _format_results_for_display(
+    results: List[KeyframeServiceReponse],
+    controller: QueryController
+) -> KeyframeDisplay:
+    """
+    Hàm helper để nhận kết quả thô từ controller và chuyển đổi sang định dạng hiển thị.
+    """
+    # Sử dụng list comprehension cho gọn gàng
+    display_results = [
+        # SỬA LỖI: Dùng ** để unpack dictionary, tự động điền tất cả các trường khớp tên.
+        # Điều này sẽ tự động bao gồm cả 'ocr_text' mà không cần liệt kê thủ công.
+        SingleKeyframeDisplay(**controller.convert_to_display_result(result))
+        for result in results
+    ]
+    return KeyframeDisplay(results=display_results)
 
-
-@router.post(
-    "/search",
-    response_model=KeyframeDisplay,
-    summary="Simple text search for keyframes",
-    description="""
-    Perform a simple text-based search for keyframes using semantic similarity.
-    This endpoint converts the input text query to an embedding and searches for
-    the most similar keyframes in the database.
-
-    **Parameters:**
-    - **query**: The search text (1-1000 characters)
-    - **top_k**: Maximum number of results to return (1-100, default: 10)
-    - **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.0)
-
-    **Returns:**
-    List of keyframes with their metadata and confidence scores, ordered by similarity.
-
-    **Example:**
-    ```
-    {
-        "query": "person walking in the park",
-        "top_k": 5,
-        "score_threshold": 0.7
-    }
-    ```
-    """,
-    response_description="List of matching keyframes with confidence scores"
-)
+# --- SEMANTIC SEARCH ENDPOINTS ---
+@router.post("/search", response_model=KeyframeDisplay, summary="Simple Semantic Search")
 async def search_keyframes(
     request: TextSearchRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """Search for keyframes using text query with semantic similarity."""
-    logger.info(f"Text search request: query='{request.query}', top_k={request.top_k}, threshold={request.score_threshold}")
-    
-    results = await controller.search_text(
-        query=request.query,
-        top_k=request.top_k,
-        score_threshold=request.score_threshold
-    )
-    
-    logger.info(f"Found {len(results)} results for query: '{request.query}'")
-    
-    # Sử dụng convert_to_display_result
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data["video_name"],
-            name_img=display_data["name_img"]
-        ))
-    
-    return KeyframeDisplay(results=display_results)
+    results = await controller.search_text(request.query, request.top_k, request.score_threshold)
+    return _format_results_for_display(results, controller)
 
-@router.post(
-    "/search/exclude-groups",
-    response_model=KeyframeDisplay,
-    summary="Text search with group exclusion",
-    description="""
-    Perform text-based search for keyframes while excluding specific groups.
-    Groups can be specified as integers or strings - they will be automatically converted to strings.
-    
-    **Example:**
-    ```
-    {
-        "query": "sunset landscape",
-        "top_k": 15,
-        "score_threshold": 0.6,
-        "exclude_groups": ["1", 3, "group_7"]
-    }
-    ```
-    """,
-    response_description="List of matching keyframes excluding specified groups"
-)
+@router.post("/search/exclude-groups", response_model=KeyframeDisplay, summary="Semantic Search with Group Exclusion")
 async def search_keyframes_exclude_groups(
     request: TextSearchWithExcludeGroupsRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """Search for keyframes with group exclusion filtering."""
-    logger.info(f"Text search with group exclusion: query='{request.query}', exclude_groups={request.exclude_groups}")
-    
-    results = await controller.search_text_with_exclude_group(
-        query=request.query,
-        top_k=request.top_k,
-        score_threshold=request.score_threshold,
-        list_group_exclude=request.exclude_groups  # Đã được convert thành str bởi validator
-    )
-    
-    logger.info(f"Found {len(results)} results excluding groups {request.exclude_groups}")
-    
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
-            name_img=display_data.get("name_img", "")   
-        ))
-    
-    return KeyframeDisplay(results=display_results)
+    results = await controller.search_text_with_exclude_group(request.query, request.top_k, request.score_threshold, request.exclude_groups)
+    return _format_results_for_display(results, controller)
 
-@router.post(
-    "/search/selected-groups-videos",
-    response_model=KeyframeDisplay,
-    summary="Text search within selected groups and videos",
-    description="""
-    Perform text-based search for keyframes within specific groups and videos only.
-    Groups can be specified as integers or strings - they will be automatically converted to strings.
-    Videos remain as integers.
-    
-    **Example:**
-    ```
-    {
-        "query": "car driving on highway",
-        "top_k": 20,
-        "score_threshold": 0.5,
-        "include_groups": ["2", 4, "group_6"],
-        "include_videos":
-    }
-    ```
-    """,
-    response_description="List of matching keyframes from selected groups and videos"
-)
+@router.post("/search/selected-groups-videos", response_model=KeyframeDisplay, summary="Semantic Search with Group/Video Selection")
 async def search_keyframes_selected_groups_videos(
     request: TextSearchWithSelectedGroupsAndVideosRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """Search for keyframes within selected groups and videos."""
-    logger.info(f"Text search with selection: query='{request.query}', include_groups={request.include_groups}, include_videos={request.include_videos}")
-    
-    results = await controller.search_with_selected_video_group(
-        query=request.query,
-        top_k=request.top_k,
-        score_threshold=request.score_threshold,
-        list_of_include_groups=request.include_groups,  # Đã được convert thành str bởi validator
-        list_of_include_videos=request.include_videos   # Giữ nguyên int
-    )
-    
-    logger.info(f"Found {len(results)} results within selected groups/videos")
-    
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-           path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data.get("video_name", ""),  # hoặc lấy mặc định nếu không có
-            name_img=display_data.get("name_img", "")   
-        ))
-    
-    return KeyframeDisplay(results=display_results)
+    results = await controller.search_with_selected_video_group(request.query, request.top_k, request.score_threshold, request.include_groups, request.include_videos)
+    return _format_results_for_display(results, controller)
 
-@router.post(
-    "/search/ocr",
-    response_model=KeyframeDisplay,
-    summary="OCR text search for keyframes",
-    description="Perform text search on OCR data of keyframes using Elasticsearch with Vietnamese analysis.",
-    response_description="List of matching keyframes based on OCR text"
-)
+# --- OCR SEARCH ENDPOINTS ---
+@router.post("/search/ocr", response_model=KeyframeDisplay, summary="Simple OCR Search")
 async def search_keyframes_ocr(
-    request: TextSearchRequest, # Có thể tái sử dụng hoặc tạo schema mới nếu cần
+    request: TextSearchRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """Search for keyframes using OCR text."""
-    logger.info(f"OCR search request: query='{request.query}', top_k={request.top_k}")
-    
-    results = await controller.search_ocr(
-        query=request.query,
-        top_k=request.top_k
-    )
-    
-    logger.info(f"Found {len(results)} OCR results for query: '{request.query}'")
-    
-    # Logic hiển thị kết quả hoàn toàn giống với các endpoint khác
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data["video_name"],
-            name_img=display_data["name_img"]
-        ))
-    
-    return KeyframeDisplay(results=display_results)
+    results = await controller.search_ocr(request.query, request.top_k)
+    return _format_results_for_display(results, controller)
 
-@router.post(
-    "/search/ocr/exclude-groups",
-    response_model=KeyframeDisplay,
-    summary="OCR search with group exclusion",
-    description="Perform OCR-based search while excluding specific groups."
-)
+@router.post("/search/ocr/exclude-groups", response_model=KeyframeDisplay, summary="OCR Search with Group Exclusion")
 async def search_keyframes_ocr_exclude_groups(
     request: TextSearchWithExcludeGroupsRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """OCR search with group exclusion filtering."""
-    results = await controller.search_ocr_with_exclude_group(
-        query=request.query,
-        top_k=request.top_k,
-        exclude_groups=request.exclude_groups
-    )
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data["video_name"],
-            name_img=display_data["name_img"]
-        ))
-    return KeyframeDisplay(results=display_results)
-    
+    results = await controller.search_ocr_with_exclude_group(request.query, request.top_k, request.exclude_groups)
+    return _format_results_for_display(results, controller)
 
-@router.post(
-    "/search/ocr/selected-groups-videos",
-    response_model=KeyframeDisplay,
-    summary="OCR search within selected groups and videos",
-    description="Perform OCR-based search within specific groups and videos only."
-)
+@router.post("/search/ocr/selected-groups-videos", response_model=KeyframeDisplay, summary="OCR Search with Group/Video Selection")
 async def search_keyframes_ocr_selected_groups_videos(
     request: TextSearchWithSelectedGroupsAndVideosRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """OCR search within selected groups and videos."""
-    results = await controller.search_ocr_with_selected_video_group(
-        query=request.query,
-        top_k=request.top_k,
-        include_groups=request.include_groups,
-        include_videos=request.include_videos
+    results = await controller.search_ocr_with_selected_video_group(request.query, request.top_k, request.include_groups, request.include_videos)
+    return _format_results_for_display(results, controller)
+
+@router.get(
+    "/search/similar/{keyframe_key}",
+    response_model=KeyframeDisplay,
+    summary="Find similar images (Image-to-Image search)",
+    description="Cung cấp key của một keyframe, API sẽ trả về các keyframe có vector gần nhất."
+)
+async def search_similar_keyframes(
+    keyframe_key: int = FastAPIPath(..., ge=0, description="The unique key of the source keyframe"),
+    top_k: int = Query(default=100, ge=1, le=100, description="Number of similar results to return"),
+    controller: QueryController = Depends(get_query_controller)
+):
+    results = await controller.search_similar_images(
+        key=keyframe_key,
+        top_k=top_k
     )
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"],
-            video_name=display_data["video_name"],
-            name_img=display_data["name_img"]
-        ))
-    return KeyframeDisplay(results=display_results)
+    return _format_results_for_display(results, controller)
+
+@router.post(
+    "/search/similar/upload",
+    response_model=KeyframeDisplay,
+    summary="Find similar images by uploading an image",
+    description="Upload một file ảnh, API sẽ trả về các keyframe có vector gần nhất."
+)
+async def search_similar_by_upload(
+    # FastAPI sẽ nhận file từ một form-data có key là "file"
+    file: UploadFile = File(..., description="The image file to search with"),
+    # Nhận top_k cũng từ form-data
+    top_k: int = Form(default=100, ge=1, le=100, description="Number of similar results to return"),
+    controller: QueryController = Depends(get_query_controller)
+):
+    results = await controller.search_similar_by_upload(
+        image_file=file,
+        top_k=top_k
+    )
+    return _format_results_for_display(results, controller)

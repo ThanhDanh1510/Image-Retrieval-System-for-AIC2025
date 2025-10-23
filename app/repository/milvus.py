@@ -70,6 +70,23 @@ class KeyframeVectorRepository(MilvusBaseRepository):
             total_found=len(results),
         )
     
+    async def get_vector_by_id(self, key: int) -> list[float] | None:
+        """
+        Lấy vector embedding của một keyframe dựa vào ID (key) của nó.
+        """
+        # Milvus's query method is efficient for fetching by primary key.
+        # expr is the query expression, output_fields specifies what to return.
+        results = self.collection.query(
+            expr=f"id == {key}",
+            output_fields=["embedding"]
+        )
+        
+        if not results:
+            return None
+        
+        # The result is a list of dictionaries. We expect only one.
+        return results[0].get("embedding")
+    
     def get_all_id(self) -> list[int]:
         return list(range(self.collection.num_entities))
 

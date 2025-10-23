@@ -1,0 +1,4 @@
+# Bỏ qua các file và thư mục git bên trong các submodule
+.git
+.github
+.gitignore

@@ -1,37 +1,55 @@
-# Ignore Python cache & build
+# =======================================================
+# NGUYÊN TẮC CHUNG
+# =======================================================
+
+# Bỏ qua các file cấu hình và cache của Docker và Git
+.git
+.gitignore
+.dockerignore
+docker-compose.yml
+Dockerfile
+README.md
+
+# Bỏ qua môi trường ảo Python
+.venv/
+venv/
+env/
+
+# Bỏ qua cache và các file được biên dịch của Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.egg-info/
-*.egg
+
+# Bỏ qua các file hệ điều hành và IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Bỏ qua log files
+*.log
+
+# =======================================================
+# NGUYÊN TẮC CỤ THỂ CHO DỰ ÁN NÀY
+# =======================================================
+
+# Bỏ qua toàn bộ thư mục elasticsearch và các thư mục con nặng nề của nó
+# Thư mục này chỉ cần cho service 'elasticsearch', không cần cho 'backend'
+elasticsearch/
+
+# Bỏ qua các thư mục chứa dữ liệu, model, embeddings
+# Đây là những thứ chiếm dung lượng lớn nhất
+data/
+metadata/
+images/
+embeddings/
+
+# Bỏ qua các file model và dữ liệu lớn nếu chúng nằm ở thư mục gốc
+*.pt
+*.pth
+*.spm
+*.json
+
+# Bỏ qua các thư mục build của các service khác (nếu có)
 build/
 dist/
-
-# Ignore virtual environments
-.venv/
-venv/
-ENV/
-env/
-
-# Ignore Jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# Ignore system files
-.DS_Store
-Thumbs.db
-
-# Ignore git
-.git
-.gitignore
-
-# Ignore dataset / outputs nếu có
-data/
-datasets/
-outputs/
-logs/
-
-# ✅ NHƯNG KHÔNG ignore các file cần cho build
-# Không được bỏ qua java/ và *.sh
-!*.sh
-!coccoc-tokenizer/java/
