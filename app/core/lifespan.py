@@ -92,7 +92,6 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass  # NEW
 
-        # NEW: log tình trạng Query Rewrite để dễ debug (không ảnh hưởng startup)
         try:
             if getattr(appsetting, "QUERY_REWRITE_ENABLED", False):  # NEW
                 provider = getattr(appsetting, "QUERY_REWRITE_PROVIDER", None)  # NEW
