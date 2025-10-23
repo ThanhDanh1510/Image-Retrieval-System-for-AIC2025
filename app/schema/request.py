@@ -10,30 +10,27 @@ class BaseSearchRequest(BaseModel):
 
 
 class TextSearchRequest(BaseSearchRequest):
-    """Simple text search request"""
+    """Simple text search request, also used for simple OCR search."""
     pass
-
 
 class TextSearchWithExcludeGroupsRequest(BaseSearchRequest):
     """Text search request with group exclusion"""
     exclude_groups: List[Union[int, str]] = Field(
         default_factory=list,
-        description="List of group IDs to exclude from search results (can be int or str)",
+        description="List of group IDs to exclude from search results",
     )
 
     @validator('exclude_groups', pre=True)
     def convert_groups_to_str(cls, v):
-        """Convert all group IDs to strings"""
         if isinstance(v, list):
             return [str(item) for item in v]
         return v
-
 
 class TextSearchWithSelectedGroupsAndVideosRequest(BaseSearchRequest):
     """Text search request with specific group and video selection"""
     include_groups: List[Union[int, str]] = Field(
         default_factory=list,
-        description="List of group IDs to include in search results (can be int or str)",
+        description="List of group IDs to include in search results",
     )
     include_videos: List[int] = Field(
         default_factory=list,
@@ -42,7 +39,6 @@ class TextSearchWithSelectedGroupsAndVideosRequest(BaseSearchRequest):
 
     @validator('include_groups', pre=True)
     def convert_groups_to_str(cls, v):
-        """Convert all group IDs to strings"""
         if isinstance(v, list):
             return [str(item) for item in v]
         return v

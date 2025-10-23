@@ -2,6 +2,8 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import YoutubePlayerWithFrameCounter from "./YoutubePlayerWithFrameCounter";
 
+// <<< THAY ĐỔI 1: Nhận thêm prop `onSimilaritySearch` từ App.js >>>
+export default function ResultsGrid({ results, onSimilaritySearch }) {
 const parseInfoFromPath = (path) => {
   if (!path) return { video_name: null, name_img: null };
   const match = path.match(/(L\d{2}|K\d{2}|K0\d{1})\/(V\d{3})\/(\d+)\.webp$/);
@@ -64,7 +66,7 @@ export default function ResultsGrid({ results, mode }) {
   }, [selectedResult]);
 
   const getImageSrc = (path) => {
-    if (!path) return null;
+    if (!path) return "";
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
     if (path.includes("\\") || path.match(/^[A-Z]:/)) {
       const normalizedPath = path.replace(/\\/g, "/");
@@ -79,21 +81,7 @@ export default function ResultsGrid({ results, mode }) {
     if (isNaN(frameNum) || fps <= 0) return 0;
     return frameNum / fps;
   };
-
-  const getYoutubeEmbedUrl = (video_name, name_img) => {
-    const baseUrl = youtubeLinks[video_name];
-    if (!baseUrl) return null;
-    try {
-      const urlObj = new URL(baseUrl);
-      const videoId = urlObj.searchParams.get("v");
-      if (!videoId) return null;
-      const startSeconds = Math.floor(getVideoTimeSeconds(name_img, video_name));
-      return `https://www.youtube.com/embed/${videoId}?start=${startSeconds}&autoplay=1&rel=0&modestbranding=1`;
-    } catch {
-      return null;
-    }
-  };
-
+  
   const getVideoIdFromUrl = (url) => {
     if (!url) return null;
     try {
@@ -176,27 +164,17 @@ export default function ResultsGrid({ results, mode }) {
           .sort((a, b) => b.score - a.score)
           .map((result, i) => (
             <div
-              key={i}
+              key={`${result.path}-${i}`}
               className="relative aspect-square cursor-pointer group overflow-hidden rounded-md shadow-sm hover:shadow-md transition-all duration-200"
               onClick={() => openModal(result, i + 1)}
               title={`Video: ${result.video_name}, Image: ${result.name_img}, Score: ${result.score.toFixed(3)}`}
             >
-              {result.path ? (
-                <img
-                  src={getImageSrc(result.path)}
-                  alt={`Keyframe ${i + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "";
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-100 dark:bg-gray-700 flex flex-col items-center justify-center border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300">
-                  <span className="text-lg">🖼️</span>
-                  <span className="text-xs text-center">No Image</span>
-                </div>
-              )}
+              <img
+                src={getImageSrc(result.path)}
+                alt={`Keyframe ${i + 1}`}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                onError={(e) => { e.currentTarget.src = ""; }}
+              />
               <div className="absolute top-1 right-1 bg-green-600/90 text-white px-1.5 py-0.5 rounded text-xs font-bold">
                 {Number(result.score ?? 0).toFixed(2)}
               </div>
@@ -217,9 +195,6 @@ export default function ResultsGrid({ results, mode }) {
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={closeModal}
-          aria-modal="true"
-          role="dialog"
-          aria-labelledby="modal-title"
         >
           <div
             className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto relative"
@@ -227,14 +202,13 @@ export default function ResultsGrid({ results, mode }) {
           >
             <button
               onClick={closeModal}
-              className="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Close modal"
+              className="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <XMarkIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             </button>
 
             <div className="p-6">
-              <h3 id="modal-title" className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
                 Result #{selectedResult.index}
               </h3>
               <div className="flex items-center gap-2 mb-4">
@@ -270,21 +244,40 @@ export default function ResultsGrid({ results, mode }) {
                       {selectedResult.video_name || "-"}
                     </div>
                   </div>
-
-                  <div className="mb-4 w-full">
+                  <div className="w-full">
                     <label className="block text-sm font-semibold mb-1">Image Name</label>
                     <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg font-mono text-sm">
                       {selectedResult.name_img ?? "-"}
                     </div>
                   </div>
+                  {selectedResult?.ocr_text && (
+                    <div className="w-full">
+                      <label className="block text-sm font-semibold mb-1 text-purple-600 dark:text-purple-400">OCR Text</label>
+                      <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-700 text-sm leading-relaxed max-h-32 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap font-sans text-gray-800 dark:text-gray-200">{selectedResult.ocr_text}</pre>
+                      </div>
+                    </div>
+                  )}
 
+                  {/* <<< THAY ĐỔI 2 & 3: Container chứa các nút và nút "Find Similar" mới >>> */}
                   {!showVideo && (
-                    <button
-                      className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                      onClick={() => setShowVideo(true)}
-                    >
-                      ▶ Play YouTube Video
-                    </button>
+                    <div className="flex items-center justify-center gap-4 pt-2">
+                      <button
+                        className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                        onClick={() => setShowVideo(true)}
+                      >
+                        ▶ Play YouTube
+                      </button>
+                      <button
+                        className="px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        onClick={() => {
+                          onSimilaritySearch(selectedResult.key, 100);
+                          closeModal();
+                        }}
+                      >
+                        ✨ Find Similar
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -298,7 +291,7 @@ export default function ResultsGrid({ results, mode }) {
                       fps={fpsMap[selectedResult.video_name] ?? 25}
                     />
                   ) : (
-                    <p className="text-red-600">Video YouTube không khả dụng</p>
+                    <p className="text-red-600 dark:text-red-400">YouTube video not available for this keyframe.</p>
                   )}
                 </div>
               )}

@@ -4,7 +4,8 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   XMarkIcon,
-  SparklesIcon, // <-- NEW: Import icon for rewrite button
+  SparklesIcon,
+  ArrowUpTrayIcon, // <-- NEW: Import icon for rewrite button
 } from "@heroicons/react/24/outline";
 
 const MODE_OPTIONS = [
@@ -13,6 +14,11 @@ const MODE_OPTIONS = [
   { key: "Include Groups & Videos", label: "Include Groups & Videos" },
   { key: "TRAKE", label: "TRAKE"}
 ];
+
+export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Default" }) {
+  const [value, setValue] = useState("");
+  const [mode, setMode] = useState(initialMode);
+  const [searchType, setSearchType] = useState("semantic"); 
 
 // --- Constants and helpers for Log Slider (keep as is) ---
 const SLIDER_MIN = 0;
@@ -49,6 +55,7 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
   const [isRewriting, setIsRewriting] = useState(false); // <-- NEW: Loading state for rewrite
 
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -138,6 +145,12 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
     return val.replace(/^0+(\d)/, "$1");
   };
 
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file && onImageSearch) {
+      onImageSearch(file, topK);
+    }
+    event.target.value = null; 
   const handleSliderChange = (e) => {
     const sliderVal = Number(e.target.value);
     if (sliderVal === SLIDER_MIN) {
@@ -174,6 +187,49 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-2">
+      <div className="flex items-center space-x-3">
+        <div className="flex space-x-2 flex-shrink-0">
+          <button
+            onClick={() => setSearchType("semantic")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              searchType === "semantic" 
+                ? 'bg-blue-600 text-white shadow-md' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            Semantic Search
+          </button>
+          <button
+            onClick={() => setSearchType("ocr")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              searchType === "ocr" 
+                ? 'bg-purple-600 text-white shadow-md' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            OCR Search
+          </button>
+
+          {/* >>> VỊ TRÍ 1: NÚT UPLOAD MỚI <<< */}
+          <button
+            onClick={() => fileInputRef.current.click()} // Kích hoạt input ẩn
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 bg-green-600 text-white shadow-md hover:bg-green-700 flex items-center"
+          >
+            <ArrowUpTrayIcon className="w-5 h-5 inline-block mr-2" />
+            Upload Image
+          </button>
+          
+          {/* >>> VỊ TRÍ 2: INPUT FILE ẨN <<< */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/png, image/jpeg, image/webp" // Giới hạn loại file
+            className="hidden"
+          />
+        </div>
+      </div>
+      
       <div className="relative">
         <textarea
           ref={textareaRef}
@@ -199,13 +255,8 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
         {/* Icons bên phải */}
         <div className="absolute inset-y-0 right-2 flex items-center gap-1">
           {value && (
-            <button
-              type="button"
-              aria-label="Clear"
-              onClick={() => setValue("")}
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300"
-            >
-              <XMarkIcon className="w-4 h-4" />
+            <button type="button" onClick={() => setValue("")}>
+              <XMarkIcon className="w-4 h-4 text-gray-500" />
             </button>
           )}
 
@@ -259,56 +310,27 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
                           setExcludeGroups("");
                           setIncludeGroups("");
                           setIncludeVideos("");
-                          if (m.key !== "Default") {
-                            e.preventDefault();
-                          }
-                        }}
-                      >
+                          if (m.key !== "Default") { e.preventDefault(); }
+                        }}>
                         {m.label}
                       </button>
                     )}
                   </MenuItem>
                 ))}
               </div>
-
               {mode === "Exclude Groups" && (
-                <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-                  <label className="block text-xs mb-1 text-gray-600 dark:text-gray-300">
-                    Group IDs to exclude
-                  </label>
-                  <input
-                    className="w-full rounded border px-2 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-700"
-                    placeholder="e.g., 1, 3, 7"
-                    value={excludeGroups}
-                    onChange={(e) => setExcludeGroups(e.target.value)}
-                  />
+                <div className="border-t p-3">
+                  <input className="w-full rounded border px-2 py-1 text-sm" placeholder="Groups to exclude: 1, 3"
+                    value={excludeGroups} onChange={(e) => setExcludeGroups(e.target.value)} />
                 </div>
               )}
 
               {mode === "Include Groups & Videos" && (
-                <div className="border-t border-gray-200 dark:border-gray-700 p-3 space-y-2">
-                  <div>
-                    <label className="block text-xs mb-1 text-gray-600 dark:text-gray-300">
-                      Group IDs to include
-                    </label>
-                    <input
-                      className="w-full rounded border px-2 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-700"
-                      placeholder="e.g., 2, 4, 6"
-                      value={includeGroups}
-                      onChange={(e) => setIncludeGroups(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1 text-gray-600 dark:text-gray-300">
-                      Video IDs to include
-                    </label>
-                    <input
-                      className="w-full rounded border px-2 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-700"
-                      placeholder="e.g., 101, 102, 203"
-                      value={includeVideos}
-                      onChange={(e) => setIncludeVideos(e.target.value)}
-                    />
-                  </div>
+                <div className="border-t p-3 space-y-2">
+                  <input className="w-full rounded border px-2 py-1 text-sm" placeholder="Groups to include: 2, 4"
+                    value={includeGroups} onChange={(e) => setIncludeGroups(e.target.value)} />
+                  <input className="w-full rounded border px-2 py-1 text-sm" placeholder="Videos to include: 101, 102"
+                    value={includeVideos} onChange={(e) => setIncludeVideos(e.target.value)} />
                 </div>
               )}
             </MenuItems>
@@ -334,25 +356,14 @@ export default function SearchBarIconMode({ onSubmit, initialMode = "Default" })
 
         <div className="flex items-center gap-2">
           <label className="whitespace-nowrap">📊 TopK:</label>
-          <input
-            type="number"
-            min={1}
-            max={200}
-            value={topK}
+          <input type="number" min={1} max={200} value={topK}
             onChange={(e) => {
               const val = stripLeadingZeros(e.target.value);
               setTopK(val === "" ? "" : Number(val));
             }}
-            className="w-14 p-0.5 text-center border rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white [appearance:textfield]"
-          />
-          <input
-            type="range"
-            min={1}
-            max={200}
-            value={topK}
-            onChange={(e) => setTopK(Number(e.target.value))}
-            className="w-24"
-          />
+            className="w-14 p-0.5 text-center border rounded"/>
+          <input type="range" min={1} max={200} value={topK}
+            onChange={(e) => setTopK(Number(e.target.value))} className="w-24" />
         </div>
 
         {mode !== "TRAKE" && (

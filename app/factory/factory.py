@@ -19,6 +19,9 @@ from service import KeyframeQueryService, ModelService
 from models.keyframe import Keyframe
 from core.beit3_processor import load_model_and_processor
 from pymilvus import connections, Collection as MilvusCollection
+from repository.elasticsearch import OcrRepository
+from service.ocr_service import OcrQueryService
+from elasticsearch import AsyncElasticsearch
 
 # NEW: thêm import cho query rewrite
 from typing import Optional  # NEW
@@ -41,6 +44,8 @@ class ServiceFactory:
         milvus_search_params: dict,
         model_checkpoint: str,
         tokenizer_checkpoint: str,
+        es_client: AsyncElasticsearch,
+        es_index_name: str,
         app_settings: AppSettings, # Thêm app_settings,
         milvus_db_name: str = "default",
         milvus_alias: str = "default",
@@ -63,6 +68,12 @@ class ServiceFactory:
         self._keyframe_query_service = KeyframeQueryService(
             keyframe_mongo_repo=self._mongo_keyframe_repo,
             keyframe_vector_repo=self._milvus_keyframe_repo
+        )
+        
+        self._ocr_repo = OcrRepository(client=es_client, index_name=es_index_name)
+        self._ocr_query_service = OcrQueryService(
+            ocr_repo=self._ocr_repo,
+            keyframe_mongo_repo=self._mongo_keyframe_repo # Tái sử dụng mongo repo
         )
 
         # NEW --- Query Rewrite wiring (optional, non-invasive) ---
@@ -157,6 +168,10 @@ class ServiceFactory:
 
     def get_keyframe_query_service(self):
         return self._keyframe_query_service
+    
+    def get_ocr_query_service(self):
+        return self._ocr_query_service
+
 
     # NEW
     def get_query_rewrite_service(self):

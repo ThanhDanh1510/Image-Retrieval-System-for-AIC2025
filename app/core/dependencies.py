@@ -43,6 +43,7 @@ from service import ModelService, KeyframeQueryService
 from core.settings import KeyFrameIndexMilvusSetting, MongoDBSettings, AppSettings
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
+from service.ocr_service import OcrQueryService
 from controller.ranking_controller import RankingController # Thêm
 from service import VideoRankingService # Thêm
 
@@ -120,6 +121,9 @@ def get_keyframe_service(service_factory: ServiceFactory = Depends(get_service_f
             detail=f"Keyframe service initialization failed: {str(e)}"
         )
 
+def get_ocr_service(service_factory: ServiceFactory = Depends(get_service_factory)) -> OcrQueryService:
+    """Get OCR query service from ServiceFactory"""
+    return service_factory.get_ocr_query_service()
 
 
 def get_mongo_client(request: Request):
@@ -185,6 +189,7 @@ def get_query_rewrite_service_dep(  # NEW
 def get_query_controller(
     model_service: ModelService = Depends(get_model_service),
     keyframe_service: KeyframeQueryService = Depends(get_keyframe_service),
+    ocr_service: OcrQueryService = Depends(get_ocr_service),
     milvus_settings: KeyFrameIndexMilvusSetting = Depends(get_milvus_settings),
     app_settings: AppSettings = Depends(get_app_settings),
     rewrite_service: Optional[QueryRewriteService] = Depends(get_query_rewrite_service_dep),  # NEW
@@ -211,7 +216,8 @@ def get_query_controller(
             id2index_path=id2index_path,
             model_service=model_service,
             keyframe_service=keyframe_service,
-            rewrite_service=rewrite_service,  # NEW: optional injection
+            ocr_service=ocr_service,
+            rewrite_service=rewrite_service  # NEW: optional injection
         )
 
         logger.info("Query controller created successfully")

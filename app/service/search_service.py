@@ -105,7 +105,31 @@ class KeyframeQueryService:
                 )
         return response
     
+    async def search_by_image_key(
+        self, 
+        key: int, 
+        top_k: int
+    ) -> list[KeyframeServiceReponse]:
+        """
+        Tìm kiếm các keyframe tương tự dựa trên key của một keyframe gốc.
+        """
+        # 1. Lấy vector của ảnh gốc từ Milvus
+        source_vector = await self.keyframe_vector_repo.get_vector_by_id(key)
 
+        if source_vector is None:
+            print(f"Warning: Vector for key {key} not found in Milvus.")
+            return []
+
+        # 2. Thực hiện tìm kiếm vector, nhưng loại trừ chính ảnh gốc khỏi kết quả
+        #    Chúng ta thêm key của ảnh gốc vào danh sách exclude_ids
+        #    top_k + 1 vì kết quả đầu tiên có thể là chính nó (distance=1.0)
+        return await self._search_keyframes(
+            text_embedding=source_vector,
+            top_k=top_k + 1, # Lấy nhiều hơn 1 để loại bỏ chính nó
+            score_threshold=0.0, # Lấy tất cả các kết quả gần nhất
+            exclude_indices=[key]
+        )
+        
     async def search_by_text(
         self,
         text_embedding: list[float],

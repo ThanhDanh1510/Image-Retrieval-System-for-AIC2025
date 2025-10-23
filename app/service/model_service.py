@@ -1,5 +1,6 @@
 # Project-relative path: app/service/model_service.py
 import torch
+from PIL import Image
 import numpy as np
 from typing import List
 
@@ -71,6 +72,21 @@ class ModelService:
         # Chuyển tensor (B, D) -> (D,) -> list[float]
         emb = query_embedding.squeeze(0).detach().cpu().float().ravel().tolist()
         return emb
+    
+    def embedding_image(self, image: Image.Image) -> list[float]:
+        """
+        Tạo vector embedding từ một đối tượng ảnh PIL.
+        """
+        with torch.no_grad():
+            image = image.convert("RGB")
+            processed_image = self.processor.image_processor(image).unsqueeze(0).to(self.device)
+            
+            image_features, _ = self.model(image=processed_image, only_infer=True)
+            
+            # Bây giờ image_features là một Tensor và có thể gọi .norm()
+            image_embedding = image_features / image_features.norm(dim=-1, keepdim=True)
+            
+        return image_embedding.squeeze(0).cpu().float().ravel().tolist()
 
     # --- HÀM MỚI ĐƯỢC THÊM VÀO ĐỂ HỖ TRỢ DP ---
 
