@@ -17,17 +17,25 @@ function App() {
   const apiUrl = "http://localhost:8000";
 
 
+  // 🔹 THÊM MỚI: Lưu lại mode của lần search cuối
+  const [lastSearchMode, setLastSearchMode] = useState("Default");
 
-  // Hàm handleSearch vẫn được giữ nguyên, không cần thay đổi
-  const handleSearch = async (query, mode, extras, searchType) => {
-    if (!query.trim()) {
-      setErrorMsg("Please enter a search query");
+  const parseIds = (str) =>
+    str.split(",").map((s) => s.trim()).filter(Boolean).map(Number);
+
+  // 🔹 SỬA ĐỔI: 'query' giờ có thể là string (query) hoặc string[] (events)
+  const handleSearch = async (queryOrEvents, mode, extras) => {
+    
+    // 🔹 SỬA ĐỔI: Validate cho TRAKE
+    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && !queryOrEvents.trim()) {
+      window.alert("Please enter a search query");
       return;
     }
-    if (query.length > 1000) {
+    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && queryOrEvents.length > 1000) {
       window.alert("Query too long. Please keep it under 1000 characters.");
       return;
     }
+    // (Validation cho TRAKE đã được xử lý trong Searchbar.js)
 
     setLoading(true);
     setResults([]);
@@ -38,20 +46,41 @@ function App() {
         ? `${apiUrl}/api/v1/keyframe/search/ocr`
         : `${apiUrl}/api/v1/keyframe/search`;
 
-    let endpoint = baseEndpoint;
-    let payload = {
-      query,
-      top_k: extras.top_k ?? 10,
-      score_threshold: extras.score_threshold ?? 0.0,
-    };
+    let endpoint = "";
+    let payload = {};
 
-    if (mode === "Exclude Groups") {
-      endpoint = `${baseEndpoint}/exclude-groups`;
-      payload.exclude_groups = extras.exclude_groups || [];
+    // 🔹 SỬA ĐỔI: Thêm logic cho TRAKE
+    if (mode === "TRAKE") {
+      endpoint = `${apiUrl}/api/v1/video/rank-by-events`;
+      payload = {
+        events: queryOrEvents, // Đây là một mảng string
+        top_k: extras.top_k ?? 10,
+        penalty_weight: extras.penalty_weight ?? 0.5
+      };
+    } else if (mode === "Default") {
+      endpoint = `${apiUrl}/api/v1/keyframe/search`;
+      payload = {
+        query: queryOrEvents, // Đây là một string
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+      };
+    } else if (mode === "Exclude Groups") {
+      endpoint = `${apiUrl}/api/v1/keyframe/search/exclude-groups`;
+      payload = {
+        query: queryOrEvents,
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+        exclude_groups: extras.exclude_groups || [],
+      };
     } else if (mode === "Include Groups & Videos") {
-      endpoint = `${baseEndpoint}/selected-groups-videos`;
-      payload.include_groups = extras.include_groups || [];
-      payload.include_videos = extras.include_videos || [];
+      endpoint = `${apiUrl}/api/v1/keyframe/search/selected-groups-videos`;
+      payload = {
+        query: queryOrEvents,
+        top_k: extras.top_k ?? 10,
+        score_threshold: extras.score_threshold ?? 0.0,
+        include_groups: extras.include_groups || [],
+        include_videos: extras.include_videos || [],
+      };
     }
 
     try {
@@ -63,6 +92,7 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setResults(data.results || []);
+        setLastSearchMode(mode); // 🔹 CẬP NHẬT: Lưu lại mode
       } else {
         window.alert(`API Error: ${res.status} - ${await res.text()}`);
       }
@@ -132,6 +162,12 @@ function App() {
     }
     setLoading(false);
   };
+  const avgScore = results.length
+    ? (results.reduce((a, b) => a + (b.score ?? b.dp_score ?? 0), 0) / results.length).toFixed(3)
+    : "-";
+  const maxScore = results.length
+    ? Math.max(...results.map((r) => r.score ?? r.dp_score ?? 0)).toFixed(3)
+    : "-";
 
   return (
     <ThemeProvider>
@@ -163,6 +199,7 @@ function App() {
                 <ResultsGrid
                   results={results}
                   onSimilaritySearch={handleSimilaritySearch}
+                  mode={lastSearchMode}
                 />
               </div>
             )}

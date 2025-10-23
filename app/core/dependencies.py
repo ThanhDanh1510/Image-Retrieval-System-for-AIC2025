@@ -1,3 +1,5 @@
+# Project-relative path: app/core/dependencies.py
+
 import sys
 import os
 
@@ -42,6 +44,8 @@ from core.settings import KeyFrameIndexMilvusSetting, MongoDBSettings, AppSettin
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
 from service.ocr_service import OcrQueryService
+from controller.ranking_controller import RankingController # Thêm
+from service import VideoRankingService # Thêm
 
 logger = SimpleLogger(__name__)
 
@@ -72,7 +76,7 @@ def get_service_factory(request: Request) -> ServiceFactory:
     if service_factory is None:
         logger.error("ServiceFactory not found in app state")
         raise HTTPException(
-            status_code=503, 
+            status_code=503,
             detail="Service factory not initialized. Please check application startup."
         )
     return service_factory
@@ -97,7 +101,7 @@ def get_model_service(service_factory: ServiceFactory = Depends(get_service_fact
             status_code=503,
             detail=f"Model service initialization failed: {str(e)}"
         )
-    
+
 
 def get_keyframe_service(service_factory: ServiceFactory = Depends(get_service_factory)) -> KeyframeQueryService:
     """Get keyframe query service from ServiceFactory"""
@@ -163,44 +167,92 @@ def get_milvus_repository(service_factory: ServiceFactory = Depends(get_service_
         )
 
 
+# NEW ---- Query Rewrite dependency (optional) ----
+from typing import Optional  # NEW
+from service.query_rewrite_service import QueryRewriteService  # NEW
+
+def get_query_rewrite_service_dep(  # NEW
+    service_factory: ServiceFactory = Depends(get_service_factory)  # NEW
+) -> Optional[QueryRewriteService]:  # NEW
+    """
+    Trả về QueryRewriteService nếu đã bật và khởi tạo,
+    ngược lại trả về None để controller tự fallback.  # NEW
+    """  # NEW
+    try:  # NEW
+        return service_factory.get_query_rewrite_service()  # NEW
+    except Exception as e:  # NEW
+        logger.warning(f"QueryRewriteService unavailable: {e}")  # NEW
+        return None  # NEW
+# NEW ---- end Query Rewrite dependency ----
+
+
 def get_query_controller(
     model_service: ModelService = Depends(get_model_service),
     keyframe_service: KeyframeQueryService = Depends(get_keyframe_service),
     ocr_service: OcrQueryService = Depends(get_ocr_service),
     milvus_settings: KeyFrameIndexMilvusSetting = Depends(get_milvus_settings),
-    app_settings: AppSettings = Depends(get_app_settings)
+    app_settings: AppSettings = Depends(get_app_settings),
+    rewrite_service: Optional[QueryRewriteService] = Depends(get_query_rewrite_service_dep),  # NEW
 ) -> QueryController:
     """Get query controller instance"""
     try:
         logger.info("Creating query controller...")
-        
+
         data_folder = Path(app_settings.DATA_FOLDER)
         id2index_path = Path(app_settings.ID2INDEX_PATH)
-        
+
         if not data_folder.exists():
             logger.warning(f"Data folder does not exist: {data_folder}")
             data_folder.mkdir(parents=True, exist_ok=True)
-            
+
         if not id2index_path.exists():
             logger.warning(f"ID2Index file does not exist: {id2index_path}")
             id2index_path.parent.mkdir(parents=True, exist_ok=True)
             with open(id2index_path, 'w') as f:
                 json.dump({}, f)
-        
+
         controller = QueryController(
             data_folder=data_folder,
             id2index_path=id2index_path,
             model_service=model_service,
             keyframe_service=keyframe_service,
-            ocr_service=ocr_service
+            ocr_service=ocr_service,
+            rewrite_service=rewrite_service  # NEW: optional injection
         )
-        
+
         logger.info("Query controller created successfully")
         return controller
-        
+
     except Exception as e:
         logger.error(f"Failed to create query controller: {str(e)}")
         raise HTTPException(
             status_code=503,
             detail=f"Query controller initialization failed: {str(e)}"
         )
+
+
+# --- THÊM MỚI ---
+
+def get_video_ranking_service(
+    service_factory: ServiceFactory = Depends(get_service_factory)
+) -> VideoRankingService:
+    try:
+        service = service_factory.get_video_ranking_service()
+        if service is None:
+            raise HTTPException(status_code=503, detail="Video ranking service not available")
+        return service
+    except Exception as e:
+        logger.error(f"Failed to get video ranking service: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Video ranking service init failed: {str(e)}")
+
+def get_ranking_controller(
+    service_factory: ServiceFactory = Depends(get_service_factory)
+) -> RankingController:
+    try:
+        controller = service_factory.get_ranking_controller()
+        if controller is None:
+            raise HTTPException(status_code=503, detail="Ranking controller not available")
+        return controller
+    except Exception as e:
+        logger.error(f"Failed to get ranking controller: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Ranking controller init failed: {str(e)}")

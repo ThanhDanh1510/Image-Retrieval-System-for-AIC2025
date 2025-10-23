@@ -142,3 +142,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  default:
+    name: milvus

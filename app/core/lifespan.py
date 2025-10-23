@@ -1,3 +1,4 @@
+# Project-relative path: app/core/lifespan.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -14,13 +15,15 @@ ROOT_DIR = os.path.abspath(
 sys.path.insert(0, ROOT_DIR)
 
 
-from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings
+from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings, ElasticsearchSettings
 from models.keyframe import Keyframe
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
 from elasticsearch import AsyncElasticsearch # Thêm import
-from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings, ElasticsearchSettings # Thêm ElasticsearchSettings
 
+# --- XÓA DÒNG GÂY LỖI ---
+# Dòng import "init_dependencies" đã được xóa vì nó không cần thiết và gây ra lỗi.
+# Toàn bộ logic khởi tạo đã nằm trong ServiceFactory.
 
 mongo_client: AsyncIOMotorClient = None
 es_client: AsyncElasticsearch = None
@@ -34,7 +37,7 @@ async def lifespan(app: FastAPI):
     FastAPI lifespan context manager for startup and shutdown events
     """
     logger.info("Starting up application...")
-    
+
     try:
         mongo_settings = MongoDBSettings()
         milvus_settings = KeyFrameIndexMilvusSetting()
@@ -46,12 +49,12 @@ async def lifespan(app: FastAPI):
             f"mongodb://{mongo_settings.MONGO_USER}:{mongo_settings.MONGO_PASSWORD}"
             f"@{mongo_settings.MONGO_HOST}:{mongo_settings.MONGO_PORT}"
         )
-        
+
         mongo_client = AsyncIOMotorClient(mongo_connection_string)
-        
+
         await mongo_client.admin.command('ping')
         logger.info("Successfully connected to MongoDB")
-        
+
         database = mongo_client[mongo_settings.MONGO_DB]
         await init_beanie(
             database=database,
@@ -72,37 +75,58 @@ async def lifespan(app: FastAPI):
             "metric_type": milvus_settings.METRIC_TYPE,
             "params": milvus_settings.SEARCH_PARAMS
         }
-        
+
+        # ServiceFactory sẽ khởi tạo TẤT CẢ các service và controller cần thiết
         service_factory = ServiceFactory(
             milvus_collection_name=milvus_settings.COLLECTION_NAME,
             milvus_host=milvus_settings.HOST,
             milvus_port=milvus_settings.PORT,
-            milvus_user="",  
-            milvus_password="",  
+            milvus_user="",
+            milvus_password="",
             milvus_search_params=milvus_search_params,
             model_checkpoint=r"D:\AIC\Image-Retrieval-System-for-AIC2025\beit3\beit3_large_patch16_384_f30k_retrieval.pth",  # Thay bằng đường dẫn thực tế
             tokenizer_checkpoint=r"D:\AIC\Image-Retrieval-System-for-AIC2025\beit3\beit3.spm",  # Thay bằng đường dẫn thực tế
             es_client=es_client, # Truyền ES client
-            es_index_name=es_settings.ES_OCR_INDEX, 
+            es_index_name=es_settings,
+            app_settings=appsetting, # Truyền app_settings vào đây
             mongo_collection=Keyframe
         )
+
+        # --- XÓA DÒNG GÂY LỖI ---
+        # Lệnh gọi init_dependencies() đã được xóa.
+
         logger.info("Service factory initialized successfully")
-        
+
         app.state.service_factory = service_factory
         app.state.mongo_client = mongo_client
         app.state.es_client = es_client
+
+        # NEW: expose AppSettings vào app.state cho các nơi khác (optional, không phá hành vi cũ)
+        try:
+            app.state.app_settings = appsetting  # NEW
+        except Exception:
+            pass  # NEW
+
+        try:
+            if getattr(appsetting, "QUERY_REWRITE_ENABLED", False):  # NEW
+                provider = getattr(appsetting, "QUERY_REWRITE_PROVIDER", None)  # NEW
+                logger.info(f"Query rewrite is ENABLED (provider={provider})")  # NEW
+            else:
+                logger.info("Query rewrite is DISABLED")  # NEW
+        except Exception as _e:
+            logger.warning(f"Unable to read query rewrite settings: {_e}")  # NEW
         
         logger.info("Application startup completed successfully")
-        
+
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         raise
-    
-    yield  
-    
+
+    yield
+
 
     logger.info("Shutting down application...")
-    
+
     try:
         if mongo_client:
             mongo_client.close()
@@ -112,8 +136,8 @@ async def lifespan(app: FastAPI):
             await es_client.close()
             logger.info("Elasticsearch connection closed")
             
+
         logger.info("Application shutdown completed successfully")
-        
+
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
-

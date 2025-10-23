@@ -1,3 +1,4 @@
+# Project-relative path: app/service/search_service.py
 import os
 import sys
 ROOT_DIR = os.path.abspath(
@@ -170,32 +171,32 @@ class KeyframeQueryService:
         """
         range_queries: a bunch of start end indices, and we just search inside these, ignore everything
         """
-        return await self._search_keyframes(text_embedding, top_k, score_threshold, exclude_ids)   
-    
-
-
-    
+        return await self._search_keyframes(text_embedding, top_k, score_threshold, exclude_ids)
 
 
 
 
-    
-        
 
 
 
-        
-
-        
-
-        
-        
-        
 
 
-        
 
-        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
