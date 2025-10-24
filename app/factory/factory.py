@@ -114,12 +114,14 @@ class ServiceFactory:
             id2index_path=Path(app_settings.ID2INDEX_PATH)
         )
 
-        # Controller cũ (cần AppSettings)
+        
         self._query_controller = QueryController(
             data_folder=Path(app_settings.DATA_FOLDER),
             id2index_path=Path(app_settings.ID2INDEX_PATH),
             model_service=self._model_service,
-            keyframe_service=self._keyframe_query_service
+            keyframe_service=self._keyframe_query_service,
+            ocr_service=self._ocr_query_service,
+            rewrite_service=self._query_rewrite_service
         )
 
     def _init_milvus_repo(

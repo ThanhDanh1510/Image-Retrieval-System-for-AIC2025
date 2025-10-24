@@ -18,8 +18,7 @@ class KeyframeServiceReponse(BaseModel):
     ocr_text: str = Field(default="", description="OCR text content")
 
 class SingleKeyframeDisplay(BaseModel):
-    # <<< THÊM DÒNG NÀY VÀO ĐÂY >>>
-    key: int 
+    key: Optional[str] = None
     path: str
     score: float
     video_name: str

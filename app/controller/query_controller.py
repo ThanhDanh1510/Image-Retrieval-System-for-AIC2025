@@ -103,10 +103,12 @@ class QueryController:
         
         path = self.get_image_url(relative_path) # Chuyển đổi sang URL ở đây
         return {
+            "key": str(model.key),  # <<< THÊM DÒNG NÀY ĐỂ FIX LỖI
             "path": path,
             "video_name": video_name,
             "name_img": name_img,
-            "score": score, "ocr_text": ocr_text, # Sử dụng score từ self.convert_model_to_path
+            "score": score, 
+            "ocr_text": ocr_text,
         }
         
 

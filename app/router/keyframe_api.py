@@ -40,7 +40,6 @@ logger = SimpleLogger(__name__)
 router = APIRouter(
     prefix="/keyframe",
     tags=["keyframe"],
-    # responses={404: {"description": "Not found"}} # Optional: Add default responses if needed
 )
 # -------------------------
 
@@ -53,11 +52,9 @@ def _format_results_for_display(
     Helper to convert raw controller results into the display format.
     """
     display_results = [
-        # Unpack the dictionary returned by convert_to_display_result
-        # This automatically includes all matching fields like path, score, video_name, name_img, ocr_text etc.
         SingleKeyframeDisplay(**controller.convert_to_display_result(result))
         for result in results
-        if result is not None # Add a check in case controller returns None for some reason
+        if result is not None
     ]
     return KeyframeDisplay(results=display_results)
 # -----------------------------------------
@@ -121,13 +118,13 @@ async def search_keyframes_ocr(
 ):
     """Search keyframes based on recognized text content (OCR)."""
     logger.info(f"OCR search: query='{request.query}', k={request.top_k}")
-    # Assuming controller has a search_ocr method similar to search_text
-    # You might need to adjust the controller method name if it's different
+    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr(
         query=request.query,
-        top_k=request.top_k,
-        score_threshold=request.score_threshold # Assuming OCR search also uses threshold
+        top_k=request.top_k
+        # score_threshold=request.score_threshold # REMOVED
     )
+    # --- END FIX ---
     logger.info(f"Found {len(results)} OCR results for query: '{request.query}'")
     return _format_results_for_display(results, controller)
 
@@ -138,13 +135,14 @@ async def search_keyframes_ocr_exclude_groups(
 ):
     """OCR search excluding specified groups."""
     logger.info(f"OCR search excluding groups: query='{request.query}', exclude={request.exclude_groups}")
-    # Assuming controller has search_ocr_with_exclude_group
+    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr_with_exclude_group(
         query=request.query,
         top_k=request.top_k,
-        score_threshold=request.score_threshold,
+        # score_threshold=request.score_threshold, # REMOVED
         list_group_exclude=request.exclude_groups
     )
+    # --- END FIX ---
     logger.info(f"Found {len(results)} OCR results excluding groups {request.exclude_groups}")
     return _format_results_for_display(results, controller)
 
@@ -155,14 +153,15 @@ async def search_keyframes_ocr_selected_groups_videos(
 ):
     """OCR search within specified groups and videos."""
     logger.info(f"OCR search selection: query='{request.query}', groups={request.include_groups}, videos={request.include_videos}")
-    # Assuming controller has search_ocr_with_selected_video_group
+    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr_with_selected_video_group(
         query=request.query,
         top_k=request.top_k,
-        score_threshold=request.score_threshold,
+        # score_threshold=request.score_threshold, # REMOVED
         list_of_include_groups=request.include_groups,
         list_of_include_videos=request.include_videos
     )
+    # --- END FIX ---
     logger.info(f"Found {len(results)} OCR results within selected groups/videos")
     return _format_results_for_display(results, controller)
 
@@ -176,12 +175,11 @@ async def search_keyframes_ocr_selected_groups_videos(
 )
 async def search_similar_keyframes(
     keyframe_key: int = FastAPIPath(..., ge=0, description="The unique key of the source keyframe"),
-    top_k: int = Query(default=100, ge=1, le=200, description="Number of similar results"), # Increased max slightly
+    top_k: int = Query(default=100, ge=1, le=200, description="Number of similar results"),
     controller: QueryController = Depends(get_query_controller)
 ):
     """Find keyframes visually similar to the one specified by key."""
     logger.info(f"Image similarity search: key={keyframe_key}, k={top_k}")
-    # Assuming controller has search_similar_images
     results = await controller.search_similar_images(
         key=keyframe_key,
         top_k=top_k
@@ -197,12 +195,11 @@ async def search_similar_keyframes(
 )
 async def search_similar_by_upload(
     file: UploadFile = File(..., description="The image file to search with"),
-    top_k: int = Form(default=100, ge=1, le=200, description="Number of similar results"), # Increased max slightly
+    top_k: int = Form(default=100, ge=1, le=200, description="Number of similar results"),
     controller: QueryController = Depends(get_query_controller)
 ):
     """Find keyframes visually similar to the uploaded image."""
     logger.info(f"Image similarity search by upload: filename='{file.filename}', k={top_k}")
-    # Assuming controller has search_similar_by_upload
     results = await controller.search_similar_by_upload(
         image_file=file,
         top_k=top_k
@@ -233,5 +230,4 @@ async def rewrite_query_endpoint(
         return RewriteResponse(original_query=request.query, rewritten_query=rewritten)
     except Exception as e:
         logger.error(f"Error during query rewrite for '{request.query}': {e}", exc_info=True)
-        # Return original query on error to avoid breaking search flow
         return RewriteResponse(original_query=request.query, rewritten_query=request.query)

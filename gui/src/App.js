@@ -1,11 +1,9 @@
-import { useState } from "react";
+import React, { useState } from "react"; // Import React
 import { ThemeProvider } from "./context/ThemeContext";
 import ThemeToggle from "./components/Mainpage/ToggleDarkLight";
 import Sidebar from "./components/Sidebar/Sidebar";
-import SearchBar from "./components/Mainpage/Searchbar";
-// <<< THAY ĐỔI 1: Xóa import ResultsMetrics không còn sử dụng >>>
-// import ResultsMetrics from "./components/Mainpage/ResultsMetrics";
-import ResultsGrid from "./components/Mainpage/ResultsGrid";
+import SearchBar from "./components/Mainpage/Searchbar"; // Ensure correct path
+import ResultsGrid from "./components/Mainpage/ResultsGrid"; // Ensure correct path
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -14,161 +12,185 @@ function App() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const apiUrl = "http://localhost:8000";
+  // Use environment variable, fallback to localhost:8000
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
+  const [lastSearchMode, setLastSearchMode] = useState("Default"); // Store mode for ResultsGrid
 
-  // 🔹 THÊM MỚI: Lưu lại mode của lần search cuối
-  const [lastSearchMode, setLastSearchMode] = useState("Default");
-
-  const parseIds = (str) =>
-    str.split(",").map((s) => s.trim()).filter(Boolean).map(Number);
-
-  // 🔹 SỬA ĐỔI: 'query' giờ có thể là string (query) hoặc string[] (events)
-  const handleSearch = async (queryOrEvents, mode, extras) => {
-    
-    // 🔹 SỬA ĐỔI: Validate cho TRAKE
+  // --- 👇 UPDATED handleSearch signature and logic 👇 ---
+  const handleSearch = async (queryOrEvents, mode, extras, searchType) => { // Added searchType
+    // Basic validation
     if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && !queryOrEvents.trim()) {
-      window.alert("Please enter a search query");
+      alert("Please enter a search query.");
       return;
     }
     if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && queryOrEvents.length > 1000) {
-      window.alert("Query too long. Please keep it under 1000 characters.");
+      alert("Query is too long (max 1000 characters).");
       return;
     }
-    // (Validation cho TRAKE đã được xử lý trong Searchbar.js)
 
+    console.log("Starting search:", { queryOrEvents, mode, extras, searchType });
     setLoading(true);
     setResults([]);
     setErrorMsg("");
-
-    const baseEndpoint =
-      searchType === "ocr"
-        ? `${apiUrl}/api/v1/keyframe/search/ocr`
-        : `${apiUrl}/api/v1/keyframe/search`;
+    setLastSearchMode(mode);
 
     let endpoint = "";
     let payload = {};
 
-    // 🔹 SỬA ĐỔI: Thêm logic cho TRAKE
-    if (mode === "TRAKE") {
-      endpoint = `${apiUrl}/api/v1/video/rank-by-events`;
-      payload = {
-        events: queryOrEvents, // Đây là một mảng string
-        top_k: extras.top_k ?? 10,
-        penalty_weight: extras.penalty_weight ?? 0.5
-      };
-    } else if (mode === "Default") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search`;
-      payload = {
-        query: queryOrEvents, // Đây là một string
-        top_k: extras.top_k ?? 10,
-        score_threshold: extras.score_threshold ?? 0.0,
-      };
-    } else if (mode === "Exclude Groups") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search/exclude-groups`;
-      payload = {
-        query: queryOrEvents,
-        top_k: extras.top_k ?? 10,
-        score_threshold: extras.score_threshold ?? 0.0,
-        exclude_groups: extras.exclude_groups || [],
-      };
-    } else if (mode === "Include Groups & Videos") {
-      endpoint = `${apiUrl}/api/v1/keyframe/search/selected-groups-videos`;
-      payload = {
-        query: queryOrEvents,
-        top_k: extras.top_k ?? 10,
-        score_threshold: extras.score_threshold ?? 0.0,
-        include_groups: extras.include_groups || [],
-        include_videos: extras.include_videos || [],
-      };
-    }
-
     try {
-      const res = await fetch(endpoint, {
+      // Determine endpoint based on searchType and mode
+      if (mode === "TRAKE") {
+        endpoint = `${apiUrl}/api/v1/video/rank-by-events`;
+        payload = {
+          events: queryOrEvents, // Array of strings
+          top_k: extras.top_k ?? 100,
+          penalty_weight: extras.penalty_weight ?? 0.5,
+        };
+      } else {
+        // Base path depends on search type
+        let basePath = "/api/v1/keyframe";
+        if (searchType === 'ocr') {
+            basePath += "/search/ocr";
+        } else { // Default to semantic
+            basePath += "/search";
+        }
+
+        // Append filter path
+        if (mode === "Exclude Groups") {
+            endpoint = `${basePath}/exclude-groups`;
+            payload = {
+                query: queryOrEvents, // String
+                top_k: extras.top_k ?? 100,
+                score_threshold: extras.score_threshold ?? 0.0,
+                exclude_groups: extras.exclude_groups || [],
+            };
+        } else if (mode === "Include Groups & Videos") {
+            endpoint = `${basePath}/selected-groups-videos`;
+             payload = {
+                query: queryOrEvents, // String
+                top_k: extras.top_k ?? 100,
+                score_threshold: extras.score_threshold ?? 0.0,
+                include_groups: extras.include_groups || [],
+                include_videos: extras.include_videos || [],
+            };
+        } else { // Default mode
+            endpoint = basePath;
+             payload = {
+                query: queryOrEvents, // String
+                top_k: extras.top_k ?? 100,
+                score_threshold: extras.score_threshold ?? 0.0,
+            };
+        }
+      }
+
+      console.log("Calling API:", endpoint, "Payload:", JSON.stringify(payload));
+
+      // --- SỬA LỖI 404 Ở ĐÂY ---
+      // Đảm bảo URL cuối cùng luôn bao gồm 'apiUrl',
+      // trừ trường hợp TRAKE đã tự thêm vào (ở dòng 48)
+      const finalEndpoint = mode === "TRAKE" ? endpoint : `${apiUrl}${endpoint}`;
+
+      const res = await fetch(finalEndpoint, { // <<< Sử dụng finalEndpoint
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.results || []);
-        setLastSearchMode(mode); // 🔹 CẬP NHẬT: Lưu lại mode
-      } else {
-        window.alert(`API Error: ${res.status} - ${await res.text()}`);
-      }
-    } catch (e) {
-      window.alert(`Connection Error: ${e.message}`);
-    }
-    setLoading(false);
-  };
+      // --- KẾT THÚC SỬA LỖI ---
 
-  const handleSimilaritySearch = async (key, top_k) => {
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API Error (${res.status}): ${errorText || res.statusText}`);
+      }
+
+      const data = await res.json();
+      console.log("API Response Data:", data);
+      setResults(data.results || []);
+
+    } catch (e) {
+      console.error("Search failed:", e);
+      setErrorMsg(`Search failed: ${e.message}`);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // --- END UPDATED handleSearch ---
+
+
+  // Handler for finding similar images from a keyframe key
+  const handleSimilaritySearch = async (key, top_k = 100) => {
+    if (key === undefined || key === null) {
+        setErrorMsg("Cannot perform similarity search: Keyframe key is missing.");
+        return;
+    }
     console.log(`Finding images similar to key: ${key} with top_k: ${top_k}`);
     setLoading(true);
     setErrorMsg("");
     setResults([]);
+    setLastSearchMode("Default"); // Similarity results use default grid view
 
-    // SỬA LỖI 1: Xây dựng URL với query parameter
     const endpoint = `${apiUrl}/api/v1/keyframe/search/similar/${key}?top_k=${top_k}`;
 
     try {
-      // SỬA LỖI 2: Thay đổi phương thức fetch
-      const res = await fetch(endpoint, {
-        method: "GET", // Đổi từ "POST" sang "GET"
-        // Không cần headers và body cho request GET
-      });
+      console.log("Calling API:", endpoint);
+      const res = await fetch(endpoint, { method: "GET" });
 
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.results || []);
-      } else {
-        setErrorMsg(`API Error: ${res.status} - ${await res.text()}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API Error (${res.status}): ${errorText || res.statusText}`);
       }
+      const data = await res.json();
+      console.log("API Response Data:", data);
+      setResults(data.results || []);
+
     } catch (e) {
-      setErrorMsg(`Connection Error: ${e.message}`);
+      console.error("Similarity search failed:", e);
+      setErrorMsg(`Similarity search failed: ${e.message}`);
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleImageSearch = async (imageFile, top_k) => {
-    console.log(`Searching by uploaded image, top_k: ${top_k}`);
+  // Handler for searching by uploaded image
+  const handleImageSearch = async (imageFile, top_k = 100) => {
+    console.log(`Searching by uploaded image: ${imageFile?.name}, top_k: ${top_k}`);
     setLoading(true);
     setErrorMsg("");
     setResults([]);
+    setLastSearchMode("Default"); // Upload results use default grid view
 
     const endpoint = `${apiUrl}/api/v1/keyframe/search/similar/upload`;
-    
-    // 1. Tạo FormData để gửi file
     const formData = new FormData();
     formData.append("file", imageFile);
     formData.append("top_k", top_k);
 
     try {
-      // 2. Gửi request với FormData
+      console.log("Calling API:", endpoint);
       const res = await fetch(endpoint, {
         method: "POST",
-        // QUAN TRỌNG: KHÔNG set 'Content-Type', trình duyệt sẽ tự làm
         body: formData,
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.results || []);
-      } else {
-        setErrorMsg(`API Error: ${res.status} - ${await res.text()}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API Error (${res.status}): ${errorText || res.statusText}`);
       }
-    } catch (e) {
-      setErrorMsg(`Connection Error: ${e.message}`);
-    }
-    setLoading(false);
-  };
-  const avgScore = results.length
-    ? (results.reduce((a, b) => a + (b.score ?? b.dp_score ?? 0), 0) / results.length).toFixed(3)
-    : "-";
-  const maxScore = results.length
-    ? Math.max(...results.map((r) => r.score ?? r.dp_score ?? 0)).toFixed(3)
-    : "-";
+      const data = await res.json();
+      console.log("API Response Data:", data);
+      setResults(data.results || []);
 
+    } catch (e) {
+      console.error("Image upload search failed:", e);
+      setErrorMsg(`Image upload search failed: ${e.message}`);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- JSX Structure (Giữ nguyên cấu trúc gốc của bạn) ---
   return (
     <ThemeProvider>
       <div className="flex h-screen bg-indigo-50 dark:bg-gray-900">
@@ -177,6 +199,7 @@ function App() {
         <div
           className={`flex-1 p-4 relative text-black dark:text-white ${mainMarginLeft} flex flex-col`}
         >
+          {/* ThemeToggle ở vị trí cũ */}
           <div className="absolute bottom-4 right-4 z-20">
             <ThemeToggle />
           </div>
@@ -190,20 +213,22 @@ function App() {
             )}
             {errorMsg && (
               <div className="text-red-600 font-semibold mt-2 text-center">
-                {errorMsg}
+                Error: {errorMsg} {/* Display error message */}
               </div>
             )}
 
+            {/* Results Grid */}
             {results.length > 0 && !loading && (
               <div className="mt-4">
                 <ResultsGrid
                   results={results}
-                  onSimilaritySearch={handleSimilaritySearch}
-                  mode={lastSearchMode}
+                  onSimilaritySearch={handleSimilaritySearch} // Pass correct handler
+                  mode={lastSearchMode} // Pass correct mode
                 />
               </div>
             )}
 
+            {/* Placeholder */}
             {!results.length && !loading && !errorMsg && (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">
@@ -213,9 +238,14 @@ function App() {
             )}
           </div>
 
-          {/* Thanh search mới ở dưới */}
+          {/* Thanh search ở dưới */}
           <div className="mt-auto pb-1">
-            <SearchBar onSubmit={handleSearch} onImageSearch={handleImageSearch} />
+             {/* Truyền các props cần thiết vào SearchBar */}
+            <SearchBar
+                onSubmit={handleSearch}
+                onImageSearch={handleImageSearch}
+                initialMode="Default"
+             />
           </div>
         </div>
       </div>

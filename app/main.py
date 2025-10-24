@@ -134,7 +134,7 @@ async def root():
         "redoc": "/redoc",
         "health": "/health",
         "api_health": "/api/v1/keyframe/health", # Giả định bạn có endpoint này
-        "search_endpoint": "/api/v1/keyframe/search",
+        "search_endpoint": "/api/v1/keyframes/search",
         "rewrite_endpoint": "/api/v1/keyframe/rewrite", # Thêm thông tin endpoint rewrite
         "ranking_endpoint": "/api/v1/video/rank-by-events", # Thêm thông tin endpoint ranking
         "images_endpoint": "/images",

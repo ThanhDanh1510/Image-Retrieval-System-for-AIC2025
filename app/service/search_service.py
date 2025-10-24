@@ -30,26 +30,23 @@ class KeyframeQueryService:
     async def _retrieve_keyframes(self, ids: list[int]):
         keyframes = await self.keyframe_mongo_repo.get_keyframe_by_list_of_keys(ids)
 
-        keyframe_map = {k.key: k for k in keyframes}
-
-        print("Type of ids:", [type(k) for k in ids])
-        print("Type of keyframe_map keys:", [type(k) for k in keyframe_map.keys()])
-
-        if len(keyframe_map) > 0:
-            sample_key = next(iter(keyframe_map.keys()))
-            if isinstance(sample_key, str):
-                ids = list(map(str, ids))
-            elif isinstance(sample_key, int):
-                ids = list(map(int, ids))
-
-        # Tránh lỗi key không tồn tại bằng cách thêm kiểm tra tồn tại key
+        keyframe_map = {}
+        if keyframes:
+            for k in keyframes:
+                try:
+                    # Luôn chuẩn hóa key trong map về INT
+                    keyframe_map[int(k.key)] = k
+                except (ValueError, TypeError):
+                    print(f"Warning: Could not convert key {k.key} to int during mapping.")
+        
+        # Sắp xếp lại kết quả theo đúng thứ tự 'ids' (thứ tự từ Milvus)
         return_keyframe = []
         missing_keys = []
-        for k in ids:
-            if k in keyframe_map:
-                return_keyframe.append(keyframe_map[k])
+        for k_int in ids: # k_int luôn là int từ Milvus
+            if k_int in keyframe_map:
+                return_keyframe.append(keyframe_map[k_int])
             else:
-                missing_keys.append(k)
+                missing_keys.append(k_int)
 
         if missing_keys:
             print(f"Warning: Missing keys in keyframe_map: {missing_keys}")
