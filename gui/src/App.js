@@ -15,88 +15,82 @@ function App() {
   // Use environment variable, fallback to localhost:8000
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
-  const [lastSearchMode, setLastSearchMode] = useState("Default"); // Store mode for ResultsGrid
+  // State to determine how ResultsGrid should render (TRAKE list or Default grid)
+  const [lastSearchModeForGrid, setLastSearchModeForGrid] = useState("Default");
 
-  // --- 👇 UPDATED handleSearch signature and logic 👇 ---
-  const handleSearch = async (queryOrEvents, mode, extras, searchType) => { // Added searchType
+  // Handler for text, OCR, and TRAKE searches initiated from SearchBar
+  const handleSearch = async (queryOrEvents, filterMode, extras, searchType) => {
     // Basic validation
-    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && !queryOrEvents.trim()) {
+    if (searchType !== "TRAKE" && typeof queryOrEvents === 'string' && !queryOrEvents.trim()) {
       alert("Please enter a search query.");
       return;
     }
-    if (mode !== "TRAKE" && typeof queryOrEvents === 'string' && queryOrEvents.length > 1000) {
+     if (searchType === "TRAKE" && Array.isArray(queryOrEvents) && queryOrEvents.length === 0) {
+      alert("Please enter at least one event for DANTE (TRAKE) mode.");
+      return;
+    }
+    if (typeof queryOrEvents === 'string' && queryOrEvents.length > 1000) {
       alert("Query is too long (max 1000 characters).");
       return;
     }
 
-    console.log("Starting search:", { queryOrEvents, mode, extras, searchType });
+
+    console.log("Starting search:", { queryOrEvents, filterMode, extras, searchType });
     setLoading(true);
-    setResults([]);
+    setResults([]); // Clear previous results
     setErrorMsg("");
-    setLastSearchMode(mode);
+    // Set grid display mode based on the search type being performed
+    setLastSearchModeForGrid(searchType === 'TRAKE' ? 'TRAKE' : 'Default');
 
     let endpoint = "";
     let payload = {};
 
     try {
-      // Determine endpoint based on searchType and mode
-      if (mode === "TRAKE") {
-        endpoint = `${apiUrl}/api/v1/video/rank-by-events`;
+      // Determine endpoint and payload based on searchType and filterMode
+      if (searchType === 'TRAKE') {
+        endpoint = `${apiUrl}/api/v1/video/rank-by-events`; // TRAKE endpoint
         payload = {
-          events: queryOrEvents, // Array of strings
+          events: queryOrEvents, // Expecting array of strings
           top_k: extras.top_k ?? 100,
           penalty_weight: extras.penalty_weight ?? 0.5,
+          // Include filter options if provided by SearchBar
+          ...(extras.exclude_groups && { exclude_groups: extras.exclude_groups }),
+          ...(extras.include_groups && { include_groups: extras.include_groups }),
+          ...(extras.include_videos && { include_videos: extras.include_videos }),
         };
-      } else {
-        // Base path depends on search type
-        let basePath = "/api/v1/keyframe";
-        if (searchType === 'ocr') {
-            basePath += "/search/ocr";
-        } else { // Default to semantic
-            basePath += "/search";
+      } else { // Semantic or OCR
+        // Determine base API path
+        let basePath = `${apiUrl}/api/v1/keyframe`; // Start with apiUrl
+        basePath += (searchType === 'ocr' ? "/search/ocr" : "/search");
+
+        // Determine full endpoint based on filterMode
+        if (filterMode === "Exclude Groups") {
+            endpoint = `${basePath}/exclude-groups`;
+        } else if (filterMode === "Include Groups & Videos") {
+            endpoint = `${basePath}/selected-groups-videos`;
+        } else { // Default filter mode
+            endpoint = basePath;
         }
 
-        // Append filter path
-        if (mode === "Exclude Groups") {
-            endpoint = `${basePath}/exclude-groups`;
-            payload = {
-                query: queryOrEvents, // String
-                top_k: extras.top_k ?? 100,
-                score_threshold: extras.score_threshold ?? 0.0,
-                exclude_groups: extras.exclude_groups || [],
-            };
-        } else if (mode === "Include Groups & Videos") {
-            endpoint = `${basePath}/selected-groups-videos`;
-             payload = {
-                query: queryOrEvents, // String
-                top_k: extras.top_k ?? 100,
-                score_threshold: extras.score_threshold ?? 0.0,
-                include_groups: extras.include_groups || [],
-                include_videos: extras.include_videos || [],
-            };
-        } else { // Default mode
-            endpoint = basePath;
-             payload = {
-                query: queryOrEvents, // String
-                top_k: extras.top_k ?? 100,
-                score_threshold: extras.score_threshold ?? 0.0,
-            };
-        }
+        // Construct payload for Semantic/OCR
+        payload = {
+          query: queryOrEvents, // Expecting string
+          top_k: extras.top_k ?? 100,
+          score_threshold: extras.score_threshold ?? 0.0,
+          // Include filter options if provided by SearchBar
+          ...(extras.exclude_groups && { exclude_groups: extras.exclude_groups }),
+          ...(extras.include_groups && { include_groups: extras.include_groups }),
+          ...(extras.include_videos && { include_videos: extras.include_videos }),
+        };
       }
 
       console.log("Calling API:", endpoint, "Payload:", JSON.stringify(payload));
 
-      // --- SỬA LỖI 404 Ở ĐÂY ---
-      // Đảm bảo URL cuối cùng luôn bao gồm 'apiUrl',
-      // trừ trường hợp TRAKE đã tự thêm vào (ở dòng 48)
-      const finalEndpoint = mode === "TRAKE" ? endpoint : `${apiUrl}${endpoint}`;
-
-      const res = await fetch(finalEndpoint, { // <<< Sử dụng finalEndpoint
+      const res = await fetch(endpoint, { // Use the determined endpoint
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      // --- KẾT THÚC SỬA LỖI ---
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -105,20 +99,18 @@ function App() {
 
       const data = await res.json();
       console.log("API Response Data:", data);
-      setResults(data.results || []);
+      setResults(data.results || []); // Update results state
 
     } catch (e) {
-      console.error("Search failed:", e);
+      console.error("Search failed:", e); // Log the full error
       setErrorMsg(`Search failed: ${e.message}`);
-      setResults([]);
+      setResults([]); // Clear results on error
     } finally {
       setLoading(false);
     }
   };
-  // --- END UPDATED handleSearch ---
 
-
-  // Handler for finding similar images from a keyframe key
+  // Handler for finding similar images based on a keyframe's key (from ResultsGrid modal)
   const handleSimilaritySearch = async (key, top_k = 100) => {
     if (key === undefined || key === null) {
         setErrorMsg("Cannot perform similarity search: Keyframe key is missing.");
@@ -128,7 +120,7 @@ function App() {
     setLoading(true);
     setErrorMsg("");
     setResults([]);
-    setLastSearchMode("Default"); // Similarity results use default grid view
+    setLastSearchModeForGrid("Default"); // Similarity results use default grid view
 
     const endpoint = `${apiUrl}/api/v1/keyframe/search/similar/${key}?top_k=${top_k}`;
 
@@ -153,13 +145,13 @@ function App() {
     }
   };
 
-  // Handler for searching by uploaded image
+  // Handler for searching by uploaded image (from SearchBar)
   const handleImageSearch = async (imageFile, top_k = 100) => {
     console.log(`Searching by uploaded image: ${imageFile?.name}, top_k: ${top_k}`);
     setLoading(true);
     setErrorMsg("");
     setResults([]);
-    setLastSearchMode("Default"); // Upload results use default grid view
+    setLastSearchModeForGrid("Default"); // Upload results use default grid view
 
     const endpoint = `${apiUrl}/api/v1/keyframe/search/similar/upload`;
     const formData = new FormData();
@@ -170,7 +162,7 @@ function App() {
       console.log("Calling API:", endpoint);
       const res = await fetch(endpoint, {
         method: "POST",
-        body: formData,
+        body: formData, // Let browser set Content-Type for FormData
       });
 
       if (!res.ok) {
@@ -190,61 +182,64 @@ function App() {
     }
   };
 
-  // --- JSX Structure (Giữ nguyên cấu trúc gốc của bạn) ---
+  // --- JSX Structure (Kept original structure) ---
   return (
     <ThemeProvider>
-      <div className="flex h-screen bg-indigo-50 dark:bg-gray-900">
+      <div className="flex h-screen bg-indigo-50 dark:bg-gray-900"> {/* Original background */}
         <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
 
         <div
           className={`flex-1 p-4 relative text-black dark:text-white ${mainMarginLeft} flex flex-col`}
         >
-          {/* ThemeToggle ở vị trí cũ */}
+          {/* ThemeToggle */}
           <div className="absolute bottom-4 right-4 z-20">
             <ThemeToggle />
           </div>
 
-          {/* Nội dung chính */}
+          {/* Main Content Area */}
           <div className="flex-1 overflow-y-auto">
+            {/* Loading Indicator */}
             {loading && (
-              <div className="text-center font-semibold dark:text-white">
+              <div className="text-center font-semibold dark:text-white pt-4"> {/* Added padding top */}
                 🔍 Searching...
               </div>
             )}
+            {/* Error Message */}
             {errorMsg && (
-              <div className="text-red-600 font-semibold mt-2 text-center">
-                Error: {errorMsg} {/* Display error message */}
+              <div className="text-red-600 font-semibold mt-2 text-center p-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded"> {/* Improved styling */}
+                Error: {errorMsg}
               </div>
             )}
 
-            {/* Results Grid */}
-            {results.length > 0 && !loading && (
+            {/* Results Grid - Conditional Rendering */}
+            {/* Show grid only if NOT loading, NO error, and results EXIST */}
+            {!loading && !errorMsg && results.length > 0 && (
               <div className="mt-4">
                 <ResultsGrid
                   results={results}
-                  onSimilaritySearch={handleSimilaritySearch} // Pass correct handler
-                  mode={lastSearchMode} // Pass correct mode
+                  onSimilaritySearch={handleSimilaritySearch} // Pass similarity search handler
+                  mode={lastSearchModeForGrid} // Pass the mode determined by the search type
                 />
               </div>
             )}
 
-            {/* Placeholder */}
-            {!results.length && !loading && !errorMsg && (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">
-                  Enter a query to begin searching.
+            {/* Placeholder - Show if NOT loading, NO error, and NO results */}
+            {!loading && !errorMsg && results.length === 0 && (
+              <div className="flex items-center justify-center h-full text-center">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
+                  Enter a query, upload an image, or click ✨ on a result to search.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Thanh search ở dưới */}
-          <div className="mt-auto pb-1">
-             {/* Truyền các props cần thiết vào SearchBar */}
+          {/* Search Bar at the bottom */}
+          <div className="mt-auto pb-1 pt-2 border-t border-gray-200 dark:border-gray-700 bg-indigo-50 dark:bg-gray-900"> {/* Added styling */}
+             {/* Pass necessary handlers to SearchBar */}
             <SearchBar
-                onSubmit={handleSearch}
-                onImageSearch={handleImageSearch}
-                initialMode="Default"
+                onSubmit={handleSearch} // Handles Text, OCR, TRAKE
+                onImageSearch={handleImageSearch} // Handles Image Upload
+                initialMode="Default" // Initial filter mode
              />
           </div>
         </div>

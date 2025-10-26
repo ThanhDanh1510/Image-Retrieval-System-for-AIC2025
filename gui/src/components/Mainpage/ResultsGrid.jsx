@@ -4,28 +4,34 @@ import YoutubePlayerWithFrameCounter from "./YoutubePlayerWithFrameCounter";
 
 // Helper function to extract info from image path
 const parseInfoFromPath = (path) => {
-  if (!path) return { video_name: null, name_img: null, key: null }; // Added key: null
+  if (!path) return { video_name: null, name_img: null, key: null };
   // Regex tries to find the keyframe key (numeric part) at the end of the filename
+  // Updated regex to handle potential padding zeros if keys are stored that way
   const keyMatch = path.match(/(\d+)\.webp$/);
-  const key = keyMatch ? parseInt(keyMatch[1], 10) : null; // Extract key if possible
+  // Key extraction needs careful checking based on how keys are actually stored/generated
+  // Assuming the filename IS the key for now. Adjust if keys are different.
+  const key = keyMatch ? parseInt(keyMatch[1], 10) : null;
 
   const match = path.match(/(L\d{2}|K\d{2}|K0\d{1})\/(V\d{3})\/(\d+)\.webp$/);
 
   if (match) {
     const [, group, video, img] = match;
+    // Attempt to use filename number as key if parsing succeeds
+    const parsedKey = parseInt(img, 10);
     return {
       video_name: `${group}_${video}`,
       name_img: img,
-      key: key, // Return the extracted key
+      key: !isNaN(parsedKey) ? parsedKey : key, // Prefer key from path structure if valid
     };
   }
 
-  console.warn("Could not parse path:", path);
-  return { video_name: null, name_img: null, key: key }; // Return key even if path parsing fails
+  console.warn("Could not parse path structure:", path);
+  // Fallback to key derived from filename only if structure parsing fails
+  return { video_name: null, name_img: null, key: key };
 };
 
 
-// <<< Receive `onSimilaritySearch` prop >>>
+// Receive `onSimilaritySearch` prop
 export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
   const [selectedResult, setSelectedResult] = useState(null);
   const [youtubeLinks, setYoutubeLinks] = useState({});
@@ -54,12 +60,17 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
 
   const openModal = (result, index) => {
     // Ensure the key exists in the result object for similarity search
-    // If results come from API directly, they should have `key`
-    // If parsed from path (TRAKE), parseInfoFromPath adds it
-    const resultWithKey = result.key !== undefined ? result : { ...result, key: parseInfoFromPath(result.path)?.key };
-    setSelectedResult({ ...resultWithKey, index });
+    // Prioritize key from API response, fallback to parsing from path
+    let keyToUse = result.key;
+    if (keyToUse === undefined || keyToUse === null) {
+        keyToUse = parseInfoFromPath(result.path)?.key;
+    }
+    // Ensure result object passed to modal has the key
+    const resultWithKey = { ...result, key: keyToUse };
+    setSelectedResult({ ...resultWithKey, index }); // index is rank or sequential number
     setShowVideo(false);
   };
+
 
   const closeModal = () => {
     setSelectedResult(null);
@@ -77,31 +88,34 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
   }, [selectedResult]);
 
   // Use a placeholder for broken images
-  const placeholderImage = "/placeholder.png"; // Add a placeholder image in your public folder
+  const placeholderImage = "/placeholder.png"; // Add placeholder.png to your public folder
 
   const getImageSrc = (path) => {
     if (!path) return placeholderImage;
-    // Basic check if it's already a full URL
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
-    // Handle potential local file paths if needed (less common for web apps)
-    // if (path.includes("\\") || path.match(/^[A-Z]:/)) {
-    //   const normalizedPath = path.replace(/\\/g, "/");
-    //   return `file:///${normalizedPath}`; // Note: file:// protocol might not work in browsers due to security
-    // }
-    // Assume it's a relative path from the server root if not a full URL
-    return path.startsWith('/') ? path : `/${path}`; // Ensure leading slash if needed
+    // Assume relative path from API base URL if not absolute
+    // Ensure REACT_APP_API_BASE_URL is set in .env for this to work correctly
+    const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+    // Check if path already includes the base image path segment
+    if (path.startsWith('/images/')) {
+        return `${baseUrl}${path}`;
+    } else {
+        // Assume path needs the '/images/' prefix
+        return `${baseUrl}/images/${path.startsWith('/') ? path.substring(1) : path}`;
+    }
   };
 
+
    const handleImageError = (e) => {
-     if (e.target.src !== placeholderImage) {
+     if (e.target.src !== placeholderImage && !e.target.src.endsWith(placeholderImage)) { // Check if not already placeholder
         console.warn(`Failed to load image: ${e.target.currentSrc || e.target.src}. Showing placeholder.`);
         e.target.src = placeholderImage;
      }
-      e.target.onerror = null; // Prevent infinite loop if placeholder fails
+      e.target.onerror = null; // Prevent infinite loop
    };
 
   const getVideoTimeSeconds = (name_img, video_name) => {
-    const fps = fpsMap[video_name] ?? 30; // Default to 30 if not found
+    const fps = fpsMap[video_name] ?? 30; // Default to 30 fps
     const frameNum = parseInt(name_img, 10);
     if (isNaN(frameNum) || fps <= 0) return 0;
     return frameNum / fps;
@@ -120,42 +134,55 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
 
   let gridContent;
 
+  // --- UI CHANGE: TRAKE Mode displays Rank and Score prominently ---
   if (mode === "TRAKE") {
-    const sortedResults = results?.slice().sort((a, b) => (b.dp_score ?? 0) - (a.dp_score ?? 0)) || [];
+    // Ensure results is an array before sorting
+    const sortedResults = Array.isArray(results) ? results.slice().sort((a, b) => (b.dp_score ?? 0) - (a.dp_score ?? 0)) : [];
     gridContent = (
       <div className="space-y-4">
         {sortedResults.length === 0 ? (
-           <p className="text-gray-500 dark:text-gray-400 text-center py-4">No TRAKE results found.</p>
+           <p className="text-gray-500 dark:text-gray-400 text-center py-4">No DANTE (TRAKE) results found.</p>
         ) : (
-          sortedResults.map((videoResult, idx) => (
+          sortedResults.map((videoResult, idx) => ( // Use index 'idx' for rank
             <div
               key={videoResult.video_id || idx}
               className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
             >
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3">
-                Video: {videoResult.video_id || `${videoResult.group_num}/${videoResult.video_num}`}
-                <span className="ml-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-                  Score: {Number(videoResult.dp_score ?? 0).toFixed(4)}
-                </span>
+              {/* --- 👇 MODIFIED THIS H3 TO SHOW RANK FIRST 👇 --- */}
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-3 flex-wrap">
+                 {/* Rank Badge */}
+                 <span className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-2.5 py-1 rounded-full text-sm font-semibold font-mono" title="Rank">
+                   #{idx + 1}
+                 </span>
+                 {/* Video ID */}
+                 <span title="Video ID">{videoResult.video_id || `${videoResult.group_num}/${videoResult.video_num}`}</span>
+                 {/* Score Badge */}
+                 <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold" title="DP Score">
+                   Score: {Number(videoResult.dp_score ?? 0).toFixed(4)}
+                 </span>
               </h3>
+              {/* --- END MODIFICATION --- */}
 
+
+              {/* Horizontal scroll for keyframes */}
               <div className="flex flex-row items-center gap-2 pb-2 overflow-x-auto">
                 {videoResult.aligned_key_paths && videoResult.aligned_key_paths.length > 0 ? (
                   videoResult.aligned_key_paths.map((path, imgIdx) => {
                     const { video_name, name_img, key } = parseInfoFromPath(path);
-                    const modalData = {
+                    const modalData = { // Data to pass to the modal
                       path: path,
-                      score: videoResult.dp_score,
+                      score: videoResult.dp_score, // Use video's DP score
                       video_name: video_name,
                       name_img: name_img,
-                      key: key, // Pass the key to modal data
+                      key: key, // Include key for similarity search
+                      rank: idx + 1, // Pass rank to modal if needed
                     };
 
                     return (
                       <div
-                        key={imgIdx}
+                        key={`${videoResult.video_id || idx}-${imgIdx}`} // More specific key
                         className="relative flex-shrink-0 cursor-pointer group"
-                        onClick={() => openModal(modalData, `Video ${idx + 1} - Frame ${imgIdx + 1}`)}
+                        onClick={() => openModal(modalData, `Rank #${idx + 1} Video - Frame ${imgIdx + 1}`)} // Pass rank info to modal title
                         title={`Video: ${video_name}, Frame: ${name_img}`}
                       >
                         <img
@@ -181,9 +208,10 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
         )}
       </div>
     );
+  // --- END TRAKE UI ---
   } else {
-    // Default grid view for semantic/OCR search
-    const sortedResults = results?.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)) || [];
+    // Default grid view for Semantic/OCR/Similarity search
+    const sortedResults = Array.isArray(results) ? results.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)) : [];
     gridContent = (
        sortedResults.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400 text-center py-4 col-span-full">No results found.</p>
@@ -191,9 +219,9 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
             {sortedResults.map((result, i) => (
               <div
-                key={result.key ? `key-${result.key}` : `idx-${i}`} // Use key if available for better stability
+                key={result.key ? `key-${result.key}` : `idx-${i}`}
                 className="relative aspect-square cursor-pointer group overflow-hidden rounded-md shadow-sm hover:shadow-md transition-all duration-200 bg-gray-100 dark:bg-gray-700"
-                onClick={() => openModal(result, i + 1)}
+                onClick={() => openModal(result, i + 1)} // Index 'i' here is just sequential order
                 title={`Video: ${result.video_name}, Frame: ${result.name_img}, Score: ${Number(result.score ?? 0).toFixed(3)}`}
               >
                 <img
@@ -212,7 +240,7 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
     );
   }
 
-  // Common Modal Structure
+  // Common Modal Structure (remains mostly the same, check key existence)
   return (
     <>
       {gridContent}
@@ -235,14 +263,16 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
             </button>
 
             <div className="p-6">
+              {/* Modal Title including Rank if available */}
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-                Result #{selectedResult.index}
+                 {typeof selectedResult.index === 'string' && selectedResult.index.includes('Rank')
+                   ? `Details for ${selectedResult.index}`
+                   : `Result Detail` } {/* Show Rank info if passed from TRAKE */}
               </h3>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 flex-wrap"> {/* Added flex-wrap */}
                 <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold">
                   Score: {Number(selectedResult.score ?? 0).toFixed(4)}
                 </span>
-                {/* Display keyframe key if available */}
                 {selectedResult.key !== undefined && selectedResult.key !== null && (
                     <span className="bg-gray-500 text-white px-3 py-1 rounded-full text-sm font-mono">
                       Key: {selectedResult.key}
@@ -263,12 +293,14 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
 
                 {/* Information and Actions */}
                 <div className="flex flex-col space-y-4">
+                  {/* Video Name */}
                   <div>
                     <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Video Name</label>
                     <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg font-mono text-sm text-gray-900 dark:text-gray-100 break-all">
                       {selectedResult.video_name || "N/A"}
                     </div>
                   </div>
+                  {/* Frame Number */}
                   <div>
                     <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Frame Number</label>
                     <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg font-mono text-sm text-gray-900 dark:text-gray-100">
@@ -290,24 +322,24 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
                   {!showVideo && (
                     <div className="flex items-center justify-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <button
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium"
+                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
                         onClick={() => setShowVideo(true)}
-                        disabled={!youtubeLinks[selectedResult.video_name]} // Disable if no link
+                        disabled={!youtubeLinks[selectedResult.video_name]}
                         title={!youtubeLinks[selectedResult.video_name] ? "YouTube link not available" : "Play video from this frame"}
                       >
                         ▶ Play YouTube
                       </button>
                       <button
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium disabled:bg-gray-400"
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => {
                            if (selectedResult.key !== undefined && selectedResult.key !== null && onSimilaritySearch) {
-                                onSimilaritySearch(selectedResult.key, 100); // Defaulting to top_k=100
+                                onSimilaritySearch(selectedResult.key, 100);
                                 closeModal();
                            } else {
-                                alert("Cannot perform similarity search: Keyframe key is missing.");
+                                alert("Cannot perform similarity search: Keyframe key is missing or callback not provided.");
                            }
                         }}
-                        disabled={selectedResult.key === undefined || selectedResult.key === null || !onSimilaritySearch} // Disable if key missing or function not passed
+                        disabled={selectedResult.key === undefined || selectedResult.key === null || !onSimilaritySearch}
                         title={selectedResult.key === undefined || selectedResult.key === null ? "Keyframe key missing" : "Find visually similar images"}
                       >
                         ✨ Find Similar
@@ -324,7 +356,7 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
                     <YoutubePlayerWithFrameCounter
                       videoId={getVideoIdFromUrl(youtubeLinks[selectedResult.video_name])}
                       startSeconds={Math.floor(getVideoTimeSeconds(selectedResult.name_img, selectedResult.video_name))}
-                      fps={fpsMap[selectedResult.video_name] ?? 30} // Use 30 fps default
+                      fps={fpsMap[selectedResult.video_name] ?? 30}
                     />
                   ) : (
                     <p className="text-red-600 dark:text-red-400 text-center py-4">
@@ -340,3 +372,4 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
     </>
   );
 }
+
