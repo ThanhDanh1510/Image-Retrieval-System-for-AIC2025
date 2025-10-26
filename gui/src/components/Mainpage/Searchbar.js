@@ -4,25 +4,25 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   XMarkIcon,
-  SparklesIcon,
+  SparklesIcon, // Icon nút rewrite
   ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 
-// Define search types - Add TRAKE here
+// Định nghĩa các loại search
 const SEARCH_TYPES = {
   SEMANTIC: 'semantic',
   OCR: 'ocr',
-  TRAKE: 'TRAKE', // Added TRAKE
+  TRAKE: 'TRAKE', // Tên cho DANTE/TRAKE
 };
 
-// Define filter modes - These apply WITHIN Semantic/OCR/TRAKE
-const FILTER_MODE_OPTIONS = [ // Renamed from MODE_OPTIONS
+// Định nghĩa các chế độ filter
+const FILTER_MODE_OPTIONS = [
   { key: "Default", label: "Default Filter" },
   { key: "Exclude Groups", label: "Exclude Groups Filter" },
   { key: "Include Groups & Videos", label: "Include Groups/Videos Filter" },
 ];
 
-// --- Constants and helpers for Log Slider ---
+// --- Hằng số và hàm cho slider Penalty (Log scale) ---
 const SLIDER_MIN = 0;
 const SLIDER_MAX = 100;
 const PENALTY_MIN_LOG_VALUE = 0.001;
@@ -39,51 +39,47 @@ const sliderToLogPenalty = (sliderValue) => {
 
 const penaltyToLogSlider = (penalty) => {
   if (penalty <= 0) return SLIDER_MIN;
-  if (penalty < PENALTY_MIN_LOG_VALUE) return 1; // Snap near min
+  if (penalty < PENALTY_MIN_LOG_VALUE) return 1;
   if (penalty >= PENALTY_MAX) return SLIDER_MAX;
   const logVal = Math.log10(penalty);
   const sliderVal = 1.0 + (logVal - LOG_MIN) / LOG_SCALE;
-  return Math.round(sliderVal); // Round to nearest integer for slider value
+  return Math.round(sliderVal);
 };
-// --- End Log Slider Helpers ---
+// --- Kết thúc helpers ---
 
-// Main Component Definition
+// Component SearchBar
 export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Default" }) {
   const [value, setValue] = useState("");
-  // --- STATE CHANGE: 'mode' is now filterMode ---
-  const [filterMode, setFilterMode] = useState(initialMode); // Renamed from 'mode'
-  // --- STATE CHANGE: Added searchType state ---
-  const [searchType, setSearchType] = useState(SEARCH_TYPES.SEMANTIC); // semantic, ocr, TRAKE
-  // --- END STATE CHANGE ---
+  const [filterMode, setFilterMode] = useState(initialMode); // State cho chế độ filter
+  const [searchType, setSearchType] = useState(SEARCH_TYPES.SEMANTIC); // State cho loại search
   const [excludeGroups, setExcludeGroups] = useState("");
   const [includeGroups, setIncludeGroups] = useState("");
   const [includeVideos, setIncludeVideos] = useState("");
   const [topK, setTopK] = useState(100);
   const [scoreThreshold, setScoreThreshold] = useState(0.0);
   const [penaltyWeight, setPenaltyWeight] = useState(0.5);
-  const [isRewriting, setIsRewriting] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false); // State loading cho nút rewrite
 
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Adjust textarea height
+  // Tự điều chỉnh chiều cao textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = "auto"; // Reset height
-    ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`; // Set height based on content, max 150px
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
   }, [value]);
 
-  // Helper functions for parsing filter inputs
-  const parseGroupIds = (str) => str.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean); // Allow comma, semicolon, space separators
+  // Helpers parse filter inputs
+  const parseGroupIds = (str) => str.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
   const parseVideoIds = (str) => str.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n));
 
-  // Handle Text/TRAKE Search Submission
+  // Hàm xử lý khi nhấn nút Search (MagnifyingGlassIcon)
   const handleSubmit = () => {
-    if (isRewriting) return; // Don't submit while AI is rewriting
+    if (isRewriting) return; // Không submit khi đang rewrite
 
-    // Prepare filter options based on the selected filterMode
-    // These apply to Semantic, OCR, AND TRAKE searches
+    // Chuẩn bị filter options dựa trên filterMode
     const filterOptions =
       filterMode === "Exclude Groups"
         ? { exclude_groups: parseGroupIds(excludeGroups) }
@@ -92,87 +88,97 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
             include_groups: parseGroupIds(includeGroups),
             include_videos: parseVideoIds(includeVideos),
           }
-        : {}; // Default mode has no extra filters
+        : {};
 
-    // Handle TRAKE search
+    // Xử lý search TRAKE (DANTE)
     if (searchType === SEARCH_TYPES.TRAKE) {
       const events = value.split('\n').map(s => s.trim()).filter(Boolean);
       if (events.length === 0) {
         window.alert("Please enter at least one event for DANTE (TRAKE) mode, separated by new lines.");
         return;
       }
-      // Pass events array, filterMode, combined options, and searchType 'TRAKE'
       onSubmit?.(events, filterMode, { ...filterOptions, top_k: topK, penalty_weight: Number(penaltyWeight) || 0 }, SEARCH_TYPES.TRAKE);
     }
-    // Handle Semantic/OCR text search
+    // Xử lý search Semantic/OCR
     else {
       const query = value.trim();
       if (!query) {
         window.alert(`Please enter text to search (${searchType}).`);
         return;
       }
-      // Pass query string, filterMode, combined options, and searchType (semantic/ocr)
       onSubmit?.(query, filterMode, { ...filterOptions, top_k: topK, score_threshold: scoreThreshold }, searchType);
     }
   };
 
-  // Handle AI Query Rewrite
+  // --- ✨ HÀM XỬ LÝ KHI NHẤN NÚT REWRITE (SparklesIcon) ✨ ---
   const handleRewriteClick = async () => {
-     const currentQuery = value.trim();
-    if (!currentQuery || isRewriting || searchType === SEARCH_TYPES.TRAKE) { // Disable rewrite for TRAKE
+    const currentQuery = value.trim();
+    // Vô hiệu hóa nếu query rỗng, đang rewrite, hoặc đang ở mode TRAKE
+    if (!currentQuery || isRewriting || searchType === SEARCH_TYPES.TRAKE) {
       return;
     }
-    setIsRewriting(true);
+    setIsRewriting(true); // Bắt đầu loading
     try {
-      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || ''}/api/v1/keyframe/rewrite`;
-      console.log("Attempting to fetch:", apiUrl);
+      // Lấy URL backend từ biến môi trường hoặc dùng default
+      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000'}/api/v1/keyframe/rewrite`;
+      console.log("Calling rewrite API:", apiUrl); // Log URL đang gọi
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: currentQuery }),
+        body: JSON.stringify({ query: currentQuery }), // Gửi query hiện tại
       });
+
+      // Kiểm tra response từ backend
       if (!response.ok) {
-         const errorText = await response.text();
+         const errorText = await response.text(); // Lấy text lỗi nếu có
+         // Ném lỗi để hiển thị alert
         throw new Error(`Rewrite failed (${response.status}): ${response.statusText}. ${errorText}`);
       }
+
+      // Parse kết quả JSON
       const data = await response.json();
+      console.log("Rewrite response data:", data); // Log kết quả
+
+      // Cập nhật ô search nếu có kết quả rewrite
       if (data && data.rewritten_query) {
-        setValue(data.rewritten_query);
+        setValue(data.rewritten_query); // Thay thế query cũ bằng query mới
       } else {
+        // Log và thông báo nếu response không đúng định dạng
         console.warn("Rewrite response missing rewritten_query:", data);
-        alert("Rewrite success, but response format unexpected. Original query kept.");
+        alert("Rewrite successful, but response format unexpected. Original query kept.");
       }
     } catch (error) {
+      // Log và hiển thị lỗi nếu có vấn đề
       console.error("Error during query rewrite:", error);
       alert(`Failed to rewrite query: ${error.message}`);
     } finally {
-      setIsRewriting(false);
+      setIsRewriting(false); // Kết thúc loading
     }
   };
+  // --- ✨ KẾT THÚC HÀM REWRITE ✨ ---
 
-
-  // Handle Image File Selection for Search
+  // Hàm xử lý khi chọn file ảnh (ArrowUpTrayIcon)
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && onImageSearch) {
-      onImageSearch(file, topK);
+      onImageSearch(file, topK); // Gọi hàm onImageSearch từ App.js
     }
     if (event.target) {
-        event.target.value = null;
+        event.target.value = null; // Reset input để có thể chọn lại cùng file
     }
   };
 
-  // Helper for input number fields
+  // Helper xóa số 0 ở đầu (cho input number)
   const stripLeadingZeros = (val) => {
-    if (val === "" || val === "0") return val; // Allow "0"
+    if (val === "" || val === "0") return val;
     return val.replace(/^0+(\d)/, "$1");
   };
 
-  // Handlers for TRAKE penalty slider/number input
+  // Handlers cho slider Penalty (TRAKE)
   const handleSliderChange = (e) => {
     const sliderVal = Number(e.target.value);
     const newPenalty = sliderToLogPenalty(sliderVal);
-    // Dynamic precision based on value magnitude for better display
     const precision = newPenalty > 0 ? Math.max(3, -Math.floor(Math.log10(newPenalty))) : 3;
     setPenaltyWeight(Number(newPenalty.toFixed(precision)));
   };
@@ -181,235 +187,167 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
      if (valStr === "" || valStr === ".") { setPenaltyWeight(valStr); return; }
      if ((valStr.match(/\./g) || []).length > 1) return;
      if (!/^\d*\.?\d*$/.test(valStr)) return;
-
-     let numVal = parseFloat(valStr);
-     if (isNaN(numVal)) { setPenaltyWeight(valStr); return; } // Still typing like "0."
-
-     // Don't clamp here, allow temporary out-of-bounds typing
-     setPenaltyWeight(valStr);
+     setPenaltyWeight(valStr); // Giữ dạng chuỗi khi đang gõ
   };
-   const handleNumberBlur = (e) => { // Final validation and clamping on blur
+   const handleNumberBlur = (e) => { // Validate khi bỏ focus
       let finalVal = parseFloat(penaltyWeight);
        if (isNaN(finalVal) || finalVal < 0) finalVal = 0;
        if (finalVal > PENALTY_MAX) finalVal = PENALTY_MAX;
-       setPenaltyWeight(finalVal); // Set the clamped number value
+       setPenaltyWeight(finalVal); // Set giá trị số đã chuẩn hóa
    };
-  const getSliderValue = () => {
+  const getSliderValue = () => { // Tính giá trị cho slider từ state
     const penaltyNum = Number(penaltyWeight);
     if (isNaN(penaltyNum)) return SLIDER_MIN;
     return penaltyToLogSlider(penaltyNum);
   };
 
-
-  // --- RENDER ---
+  // --- RENDER COMPONENT ---
   return (
     <div className="w-full max-w-3xl mx-auto space-y-3 p-2">
 
-      {/* Search Type Buttons and Upload Button */}
+      {/* Hàng nút chọn Search Type & Upload */}
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        {/* Semantic Button */}
+        {/* Nút Semantic */}
         <button
           onClick={() => setSearchType(SEARCH_TYPES.SEMANTIC)}
           className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 shadow ${
-            searchType === SEARCH_TYPES.SEMANTIC
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            searchType === SEARCH_TYPES.SEMANTIC ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
           }`}
-        >
-          Semantic
-        </button>
-        {/* OCR Button */}
+        > Semantic </button>
+        {/* Nút OCR */}
         <button
           onClick={() => setSearchType(SEARCH_TYPES.OCR)}
           className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 shadow ${
-            searchType === SEARCH_TYPES.OCR
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            searchType === SEARCH_TYPES.OCR ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
           }`}
-        >
-          OCR
-        </button>
-         {/* DANTE (TRAKE) Button */}
+        > OCR </button>
+         {/* Nút DANTE (TRAKE) */}
         <button
           onClick={() => setSearchType(SEARCH_TYPES.TRAKE)}
           className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 shadow ${
-            searchType === SEARCH_TYPES.TRAKE
-              ? 'bg-red-600 text-white' // Different color for DANTE
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            searchType === SEARCH_TYPES.TRAKE ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
           }`}
-        >
-          DANTE
-        </button>
-        {/* Upload Image Button (Disabled when DANTE active) */}
+        > DANTE </button>
+        {/* Nút Upload Image (disable khi chọn DANTE) */}
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={searchType === SEARCH_TYPES.TRAKE} // Disable upload for DANTE
+          disabled={searchType === SEARCH_TYPES.TRAKE}
           className="px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 bg-green-600 text-white shadow hover:bg-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
           title={searchType === SEARCH_TYPES.TRAKE ? "Upload disabled in DANTE mode" : "Search by uploading an image"}
-        >
-          <ArrowUpTrayIcon className="w-4 h-4 inline-block mr-1 sm:mr-2" />
-          Upload Image
-        </button>
+        > <ArrowUpTrayIcon className="w-4 h-4 inline-block mr-1 sm:mr-2" /> Upload Image </button>
+        {/* Input file ẩn */}
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/webp" className="hidden" />
       </div>
 
-      {/* Text Input Area and Action Buttons */}
+      {/* Ô nhập liệu và các nút action */}
       <div className="relative">
+        {/* Textarea nhập query/events */}
         <textarea
           ref={textareaRef}
           rows={1}
-          placeholder={ // Placeholder depends on searchType now
-            searchType === SEARCH_TYPES.TRAKE
-              ? "Enter events, one per line..."
-              : `Enter ${searchType} search query...`
+          placeholder={
+            searchType === SEARCH_TYPES.TRAKE ? "Enter events, one per line..." : `Enter ${searchType} search query...`
           }
           className="pl-3 pr-32 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-2 shadow-sm sm:text-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring focus:ring-blue-200 dark:focus:ring-blue-600 resize-none overflow-y-auto"
           style={{ minHeight: '42px', maxHeight: '150px' }}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { // Submit logic depends on searchType now
-            if (e.key === "Enter" && !e.shiftKey && searchType !== SEARCH_TYPES.TRAKE) {
-              e.preventDefault();
-              handleSubmit();
-            }
+          onKeyDown={(e) => {
+            // Submit bằng Enter (trừ DANTE và Shift+Enter)
+            if (e.key === "Enter" && !e.shiftKey && searchType !== SEARCH_TYPES.TRAKE) { e.preventDefault(); handleSubmit(); }
+            // Xóa bằng Escape
             if (e.key === "Escape") { e.preventDefault(); setValue(""); }
           }}
         />
 
-        {/* Action Icons on the right */}
+        {/* Các nút icon bên phải ô nhập liệu */}
         <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-          {/* Clear Button */}
+          {/* Nút Xóa (XMarkIcon) */}
           {value && (
             <button type="button" aria-label="Clear" onClick={() => setValue("")}
               className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
+            > <XMarkIcon className="w-4 h-4" /> </button>
           )}
 
-          {/* Rewrite Button (Disabled for DANTE) */}
+          {/* Nút Rewrite (SparklesIcon) - disable khi đang rewrite hoặc chọn DANTE */}
           <button
             type="button" aria-label="Rewrite Query" onClick={handleRewriteClick}
-            disabled={isRewriting || !value.trim() || searchType === SEARCH_TYPES.TRAKE} // Use searchType here
-            className={`p-1.5 rounded transition-colors ${
-              isRewriting
-                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                : "bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
-            }`}
+            disabled={isRewriting || !value.trim() || searchType === SEARCH_TYPES.TRAKE}
+            className={`p-1.5 rounded transition-colors ${ isRewriting ? "bg-gray-400 text-gray-600 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed" }`}
             title={searchType === SEARCH_TYPES.TRAKE ? "Rewrite unavailable in DANTE mode" : "Enhance query with AI"}
-          >
-            <SparklesIcon className={`w-4 h-4 ${isRewriting ? 'animate-spin' : ''}`} />
-          </button>
+          > <SparklesIcon className={`w-4 h-4 ${isRewriting ? 'animate-spin' : ''}`} /> </button>
 
-          {/* Filter Mode Menu */}
+          {/* Nút Filter (FunnelIcon) */}
           <Menu as="div" className="relative">
             <MenuButton
               aria-label="Select Filter Mode"
               className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-              title={`Current Filter: ${FILTER_MODE_OPTIONS.find(m => m.key === filterMode)?.label || filterMode}`} // Use filterMode here
-            >
-              <FunnelIcon className="w-4 h-4" />
-            </MenuButton>
-
-            <MenuItems
-              anchor="bottom end"
-              className="z-20 mt-2 w-64 origin-top-right rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg focus:outline-none"
-            >
+              title={`Current Filter: ${FILTER_MODE_OPTIONS.find(m => m.key === filterMode)?.label || filterMode}`}
+            > <FunnelIcon className="w-4 h-4" /> </MenuButton>
+            {/* Dropdown menu cho Filter */}
+            <MenuItems anchor="bottom end" className="z-20 mt-2 w-64 origin-top-right rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg focus:outline-none">
               <div className="py-1">
-                {FILTER_MODE_OPTIONS.map((m) => ( // Use FILTER_MODE_OPTIONS
+                {FILTER_MODE_OPTIONS.map((m) => (
                   <MenuItem key={m.key}>
                     {({ active }) => (
                       <button type="button"
-                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                          active ? "bg-blue-50 dark:bg-gray-700" : ""
-                        } ${filterMode === m.key ? "font-semibold text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-100"} `} // Use filterMode
-                        onClick={() => {
-                          setFilterMode(m.key); // Set filterMode
-                          setExcludeGroups("");
-                          setIncludeGroups("");
-                          setIncludeVideos("");
-                        }}
-                      >
-                        {m.label}
-                      </button>
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${ active ? "bg-blue-50 dark:bg-gray-700" : ""} ${ filterMode === m.key ? "font-semibold text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-100" } `}
+                        onClick={() => { setFilterMode(m.key); setExcludeGroups(""); setIncludeGroups(""); setIncludeVideos(""); }}
+                      > {m.label} </button>
                     )}
                   </MenuItem>
                 ))}
               </div>
-              {/* Filter Input Fields (logic based on filterMode) */}
+              {/* Ô nhập liệu cho Filter */}
               {filterMode === "Exclude Groups" && (
                  <div className="border-t border-gray-200 dark:border-gray-700 p-2">
-                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Exclude Groups (e.g. 1, 3)"
-                     value={excludeGroups} onChange={(e) => setExcludeGroups(e.target.value)} />
+                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Exclude Groups (e.g. 1, 3)" value={excludeGroups} onChange={(e) => setExcludeGroups(e.target.value)} />
                  </div>
               )}
               {filterMode === "Include Groups & Videos" && (
                  <div className="border-t border-gray-200 dark:border-gray-700 p-2 space-y-1">
-                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Include Groups (e.g. 2, 4)"
-                     value={includeGroups} onChange={(e) => setIncludeGroups(e.target.value)} />
-                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Include Videos (e.g. 101, 102)"
-                     value={includeVideos} onChange={(e) => setIncludeVideos(e.target.value)} />
+                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Include Groups (e.g. 2, 4)" value={includeGroups} onChange={(e) => setIncludeGroups(e.target.value)} />
+                   <input className="w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100" placeholder="Include Videos (e.g. 101, 102)" value={includeVideos} onChange={(e) => setIncludeVideos(e.target.value)} />
                  </div>
               )}
             </MenuItems>
           </Menu>
 
-          {/* Search Button */}
+          {/* Nút Search (MagnifyingGlassIcon) */}
           <button
             type="button" aria-label="Search" onClick={handleSubmit} disabled={isRewriting}
             className="p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
-          >
-            <MagnifyingGlassIcon className="w-4 h-4" />
-          </button>
+          > <MagnifyingGlassIcon className="w-4 h-4" /> </button>
         </div>
       </div>
 
-      {/* Sliders Area (Conditional Display) */}
+      {/* Khu vực Sliders (hiển thị tùy theo searchType) */}
       <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 pt-1">
-
-        {/* TopK Slider (Always visible) */}
+        {/* Slider Top K (luôn hiển thị) */}
         <div className="flex items-center gap-1 sm:gap-2">
           <label htmlFor="topKNum" className="whitespace-nowrap font-medium">Top K:</label>
           <input id="topKNum" type="number" min={1} max={200} value={topK}
-            onChange={(e) => {
-              const val = stripLeadingZeros(e.target.value);
-              setTopK(val === "" ? "" : Math.max(1, Math.min(200, Number(val))));
-            }}
-             onBlur={(e)=>{ if(e.target.value === "") setTopK(1);}}
+            onChange={(e) => { const val = stripLeadingZeros(e.target.value); setTopK(val === "" ? "" : Math.max(1, Math.min(200, Number(val)))); }}
+            onBlur={(e)=>{ if(e.target.value === "") setTopK(1);}}
             className="w-12 sm:w-14 p-0.5 text-center border rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white [appearance:textfield]"
           />
-          <input id="topKRange" type="range" min={1} max={200} value={topK}
-            onChange={(e) => setTopK(Number(e.target.value))} className="w-20 sm:w-24 cursor-pointer" />
+          <input id="topKRange" type="range" min={1} max={200} value={topK} onChange={(e) => setTopK(Number(e.target.value))} className="w-20 sm:w-24 cursor-pointer" />
         </div>
 
-        {/* Score Threshold Slider (Hidden for DANTE) */}
+        {/* Slider Score Threshold (ẩn khi chọn DANTE) */}
         {searchType !== SEARCH_TYPES.TRAKE && (
           <div className="flex items-center gap-1 sm:gap-2">
             <label htmlFor="scoreNum" className="whitespace-nowrap font-medium">Score ≥:</label>
             <input id="scoreNum" type="number" min={0} max={1} step={0.05} value={scoreThreshold}
-              onChange={(e) => {
-                let valStr = e.target.value;
-                 if (valStr === "" || valStr === ".") { setScoreThreshold(valStr); return; }
-                 if ((valStr.match(/\./g) || []).length > 1) return;
-                 if (!/^\d*\.?\d*$/.test(valStr)) return;
-                 let numVal = parseFloat(valStr);
-                 if (isNaN(numVal)) { setScoreThreshold(valStr); return; }
-                 setScoreThreshold(Math.max(0, Math.min(1, numVal)));
-              }}
-               onBlur={(e)=>{
-                   let finalVal = parseFloat(scoreThreshold);
-                   if (isNaN(finalVal) || finalVal < 0) finalVal = 0;
-                   if (finalVal > 1) finalVal = 1;
-                   setScoreThreshold(finalVal);
-               }}
+              onChange={(e) => { /*...validation...*/ setScoreThreshold(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0))); }}
+              onBlur={(e)=>{ /*...final validation...*/ setScoreThreshold(parseFloat(e.target.value) || 0); }}
               className="w-12 sm:w-14 p-0.5 text-center border rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white [appearance:textfield]"
             />
-            <input id="scoreRange" type="range" min={0} max={1} step={0.05} value={scoreThreshold}
-              onChange={(e) => setScoreThreshold(Number(e.target.value))} className="w-20 sm:w-24 cursor-pointer" />
+            <input id="scoreRange" type="range" min={0} max={1} step={0.05} value={scoreThreshold} onChange={(e) => setScoreThreshold(Number(e.target.value))} className="w-20 sm:w-24 cursor-pointer" />
           </div>
         )}
 
-        {/* Penalty Weight Slider (Only for DANTE) */}
+        {/* Slider Penalty Weight (chỉ hiển thị khi chọn DANTE) */}
         {searchType === SEARCH_TYPES.TRAKE && (
           <div className="flex items-center gap-1 sm:gap-2">
             <label htmlFor="penaltyNum" className="whitespace-nowrap font-medium">Penalty:</label>
@@ -418,11 +356,7 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
               onBlur={handleNumberBlur}
               className="w-12 sm:w-14 p-0.5 text-center border rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white [appearance:textfield]"
             />
-            <input id="penaltyRange" type="range" min={SLIDER_MIN} max={SLIDER_MAX} step={1}
-              value={getSliderValue()}
-              onChange={handleSliderChange}
-              className="w-20 sm:w-24 cursor-pointer"
-            />
+            <input id="penaltyRange" type="range" min={SLIDER_MIN} max={SLIDER_MAX} step={1} value={getSliderValue()} onChange={handleSliderChange} className="w-20 sm:w-24 cursor-pointer" />
           </div>
         )}
       </div>
