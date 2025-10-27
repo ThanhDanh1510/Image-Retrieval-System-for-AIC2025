@@ -107,7 +107,7 @@ class RankingController:
 
         try:
             # Call the service, passing filter parameters
-            service_results = await self.ranking_service.rank_videos(
+            service_results: List[dict] = await self.ranking_service.rank_videos(
                 events=request.events,
                 top_k=request.top_k,
                 penalty_weight=request.penalty_weight,

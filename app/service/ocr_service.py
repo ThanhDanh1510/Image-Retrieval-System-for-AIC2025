@@ -24,6 +24,21 @@ class OcrQueryService:
         if not es_results:
             return []
 
+        # 2. Dùng các ID tìm được để lấy thông tin đầy đủ
+        #    (Tái sử dụng logic mới được thêm vào)
+        return await self.get_full_keyframe_data(es_results)
+    
+    async def get_full_keyframe_data(
+        self,
+        es_results: list[dict]
+    ) -> list[KeyframeServiceReponse]:
+        """
+        Nhận vào kết quả thô từ Elasticsearch (gồm id, score, text)
+        và trả về danh sách KeyframeServiceReponse đầy đủ thông tin từ MongoDB.
+        """
+        if not es_results:
+            return []
+
         result_map = {res["id"]: res["score"] for res in es_results}
         sorted_ids = [res["id"] for res in es_results]
         

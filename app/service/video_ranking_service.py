@@ -224,16 +224,19 @@ class VideoRankingService:
 
             # Ensure aligned_relative_indices are valid before using them
             if aligned_relative_indices and all(0 <= idx < T for idx in aligned_relative_indices):
-                # --- Map relative indices back to the actual unique key IDs ---
+                
+                # 1. Map các chỉ số tương đối (vd: [0, 2, 5]) về key ID thật
+                #    Kết quả `aligned_key_ids_actual` sẽ là một List[int]
                 aligned_key_ids_actual = [filtered_key_ids[i] for i in aligned_relative_indices]
-                # --- END MAPPING ---
 
+                # 2. Thêm dict kết quả vào list
                 all_video_results.append({
                     "video_id": video_id,
                     "score": dp_score,
-                    "aligned_key_ids": aligned_key_ids_actual # Return the UNIQUE INT KEYS
+                    # Trả về danh sách các key ID đã align
+                    "aligned_key_ids": aligned_key_ids_actual 
                 })
-            elif dp_score > -np.inf: # Log if DP finished but path was invalid
+            elif dp_score > -np.inf: 
                  logger.warning(f"DP for video {video_id} yielded score {dp_score} but an invalid path: {aligned_relative_indices} (T={T})")
 
 

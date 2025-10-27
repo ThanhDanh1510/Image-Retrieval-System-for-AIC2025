@@ -155,29 +155,53 @@ class QueryController:
     async def search_ocr(self, query: str, top_k: int):
         return await self.ocr_service.search_by_text(query, top_k)
 
-    async def search_ocr_with_exclude_group(self, query: str, top_k: int, exclude_groups: list[str]):
-        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10)
+    async def search_ocr_with_exclude_group(
+        self, 
+        query: str, 
+        top_k: int, 
+        list_group_exclude: list[str]  # <<< SỬA 1: Đổi tên tham số
+    ):
+        # 1. Lấy kết quả lớn từ ES
+        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10) # Lấy nhiều hơn để lọc
         if not es_results: return []
 
-        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in exclude_groups}
+        # 2. Chuẩn hóa nhóm
+        # <<< SỬA 2: Dùng list_group_exclude
+        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_group_exclude} 
+        
+        # 3. Lấy các ID cần loại trừ từ Mongo
         repo = self.ocr_service.keyframe_mongo_repo
         docs = await repo.find({"group_num": {"$in": list(groups)}})
         exclude_ids = {d.key for d in docs}
 
+        # 4. Lọc kết quả ES trong Python
         filtered_es_results = [res for res in es_results if res["id"] not in exclude_ids][:top_k]
         if not filtered_es_results: return []
 
+        # 5. Lấy data đầy đủ cho các ID đã lọc
         return await self.ocr_service.get_full_keyframe_data(filtered_es_results)
 
-    async def search_ocr_with_selected_video_group(self, query: str, top_k: int, include_groups: list[str], include_videos: list[int]):
-        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10)
+    async def search_ocr_with_selected_video_group(
+        self, 
+        query: str, 
+        top_k: int, 
+        list_of_include_groups: list[str], # <<< SỬA 3: Đổi tên tham số
+        list_of_include_videos: list[int]  # <<< SỬA 4: Đổi tên tham số
+    ):
+        # 1. Lấy kết quả lớn từ ES
+        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10) # Lấy nhiều hơn để lọc
         if not es_results: return []
 
-        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in include_groups}
-        videos = set(include_videos)
+        # 2. Chuẩn hóa nhóm
+        # <<< SỬA 5: Dùng list_of_include_groups
+        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_of_include_groups}
+        # <<< SỬA 6: Dùng list_of_include_videos
+        videos = set(list_of_include_videos)
         repo = self.ocr_service.keyframe_mongo_repo
         
+        # 3. Lấy các ID được phép từ Mongo
         if not groups and not videos:
+            # Nếu không có bộ lọc, tất cả ID từ ES đều được phép
             allowed_ids = {res['id'] for res in es_results}
         else:
             filt = {}
@@ -186,9 +210,11 @@ class QueryController:
             docs = await repo.find(filt)
             allowed_ids = {d.key for d in docs}
 
+        # 4. Lọc kết quả ES trong Python
         filtered_es_results = [res for res in es_results if res["id"] in allowed_ids][:top_k]
         if not filtered_es_results: return []
         
+        # 5. Lấy data đầy đủ
         return await self.ocr_service.get_full_keyframe_data(filtered_es_results)
     
     async def search_similar_images(self, key: int, top_k: int):
