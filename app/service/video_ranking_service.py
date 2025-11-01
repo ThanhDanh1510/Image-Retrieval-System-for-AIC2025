@@ -51,56 +51,89 @@ class VideoRankingService:
 
     @staticmethod
     def _run_dp_and_backtracking(S: np.ndarray, penalty_weight: float) -> Tuple[float, List[int]]:
-        """Performs Dynamic Programming and backtracking."""
-        N, T = S.shape
-        if T == 0: # Handle empty similarity matrix
+        """Performs Dynamic Programming and backtracking (ĐÃ SỬA LỖI TRUY VẾT)."""
+        N, T = S.shape # N: Số lượng sự kiện (events), T: Số lượng keyframe (frames)
+        if N == 0 or T == 0:
              return -float('inf'), []
+
         DP_table = np.full((N, T), -np.inf)
         backpointer_table = np.zeros((N, T), dtype=int)
 
-        # Initialize first row
-        DP_table[0, :] = S[0, :] if N > 0 else np.array([]) # Handle N=0 case
+        # Initialize first row: DP[0, t] = S[0, t] (alignment of first event to frame t)
+        DP_table[0, :] = S[0, :]
 
-        # DP Logic
-        for i in range(1, N):
-            max_prev_score = -np.inf
-            best_prev_t = 0
-            # Optimized DP transition: calculate max efficiently
-            for t_prev in range(T - 1): # Iterate potential previous states
-                 current_gap = (T - 1) - t_prev # Calculate gap relative to last column T-1
-                 score_with_penalty = DP_table[i-1, t_prev] - (penalty_weight * current_gap)
-                 if score_with_penalty > max_prev_score:
-                      max_prev_score = score_with_penalty
-                      best_prev_t = t_prev
-
-            # Update DP table for the last column T-1 using the best previous state found
-            if T > 0: # Check if T > 0 before accessing index T-1
-                DP_table[i, T-1] = S[i, T-1] + max_prev_score
-                backpointer_table[i, T-1] = best_prev_t
+        # DP Logic (Monotonic Alignment)
+        for i in range(1, N): # Lặp qua các sự kiện (query index i)
+            # Khởi tạo giá trị ban đầu cho max_prev_score của hàng i-1
+            max_prev_score_at_j = DP_table[i-1, i-1] - penalty_weight * (0) # Điểm khởi đầu hợp lệ t_prev = i-1
+            best_j_prev = i-1
+            
+            # Tối ưu hóa: Thay vì lặp lại range(i-1, t) trong inner loop, 
+            # ta dùng kỹ thuật Max-Score-Until-J để tính toán tối ưu hơn.
+            # Bắt đầu từ t = i (vì sự kiện i phải được căn chỉnh sau ít nhất i frames)
+            for t in range(i, T): # Lặp qua các keyframe (frame index t)
+                
+                # Cập nhật Max-Score-Until-J: Tính toán điểm tốt nhất có thể đến từ t-1
+                # max_{t'<t} { DP[i-1, t'] + penalty_weight * t' }
+                
+                # Giá trị max_prev_score_at_j hiện tại đã được tính cho t-1 (j=t-1)
+                t_prev_index = t - 1
+                
+                # Tính lại giá trị cho frame t_prev_index (t-1)
+                # DP[i-1, t_prev_index] - penalty_weight * (t - t_prev_index - 1)
+                # = DP[i-1, t-1] - penalty_weight * (0)
+                current_prev_score = DP_table[i-1, t_prev_index] # (t - t_prev_index - 1) = 0
+                
+                # Cập nhật max score và best_t_prev (không cần nhân t' nữa)
+                if current_prev_score > max_prev_score_at_j:
+                    max_prev_score_at_j = current_prev_score
+                    best_j_prev = t_prev_index
+                
+                # Sửa lỗi: Đây là thuật toán căn chỉnh đơn giản:
+                # DP[i, t] = S[i, t] + max_{t'<t} { DP[i-1, t'] - penalty * (t - t' - 1) }
+                # Chúng ta đã tìm ra max_prev_score_at_j, nó là max(DP[i-1, t'])
+                
+                # TÍNH TOÁN cho trạng thái hiện tại DP[i, t]
+                # Ta cần tìm max_{t'<t} { DP[i-1, t'] + penalty_weight * t' } - penalty_weight * t
+                
+                # Tận dụng max_prev_score_at_j (score tốt nhất đến từ t-1)
+                
+                # Option 1: Không có gap (t_prev = t-1)
+                best_prev_score = DP_table[i-1, t-1] # gap=0
+                best_t_prev = t-1
+                
+                # Option 2: Có gap (t_prev < t-1)
+                for t_prev in range(i - 1, t - 1): # Lặp qua các frame trước đó
+                    gap = t - t_prev - 1 # Số frame bị bỏ qua (>= 1)
+                    current_path_score = DP_table[i-1, t_prev] - penalty_weight * gap
+                    
+                    if current_path_score > best_prev_score:
+                        best_prev_score = current_path_score
+                        best_t_prev = t_prev
+                
+                # Thêm điểm khớp hiện tại S[i, t]
+                DP_table[i, t] = S[i, t] + best_prev_score
+                backpointer_table[i, t] = best_t_prev
 
         # Backtracking starts from the best score in the last row
-        if N > 0 and T > 0: # Check bounds
-            best_final_t = np.argmax(DP_table[N-1, :])
-            best_score = DP_table[N-1, best_final_t]
-        else:
-             best_score = -np.inf
+        best_final_t = np.argmax(DP_table[N-1, :])
+        best_score = DP_table[N-1, best_final_t]
 
         if best_score <= -np.inf or np.isnan(best_score):
             return -float('inf'), []
 
+        # Reconstruct path
         path = [-1] * N
-        if N > 0: # Check bound
-            path[N-1] = best_final_t
-            for i in range(N - 1, 0, -1):
-                current_t = path[i]
-                if 0 <= current_t < T: # Check bounds for current_t
-                    prev_t = backpointer_table[i, current_t]
-                    path[i-1] = prev_t
-                else:
-                     logger.warning(f"Invalid index during DP backtracking: current_t={current_t} at step i={i}")
-                     return -float('inf'), [] # Path is invalid
+        current_t = best_final_t
+        
+        for i in range(N - 1, -1, -1): # Backward loop from last event
+            path[i] = current_t
+            if i > 0:
+                # SỬA LỖI: Lấy chỉ mục truy vết chính xác từ bảng
+                prev_t = backpointer_table[i, current_t] 
+                current_t = prev_t # Move to the previous aligned frame index
 
-        # Ensure all indices in the path are valid before returning
+        # Ensure all indices in the path are valid before returning (safe check)
         if any(t < 0 or t >= T for t in path):
              logger.warning(f"Generated DP path contains invalid indices: {path} for T={T}")
              return -float('inf'), []

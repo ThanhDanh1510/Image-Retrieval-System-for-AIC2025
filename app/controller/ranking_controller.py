@@ -75,17 +75,16 @@ class RankingController:
 
             group_num = int(group_str)
             video_num = int(video_str)
-            frame_idx = int(frame_idx_str) # This is the frame number, NOT the unique key
+            # Lấy số thứ tự khung hình (frame index)
+            frame_idx = int(frame_idx_str) 
 
             prefix = _prefix_from_group(group_str)
             group_folder = f"{prefix}{group_num:02d}" if prefix != "K0" else f"{prefix}{group_num:01d}"
             video_folder = f"V{video_num:03d}"
 
-            # *** ASSUMPTION: The filename IS the frame_idx (frame number) ***
-            img_name = f"{frame_idx}.webp"
-            # If the filename was the unique key, you would use:
-            # img_name = f"{key_id}.webp" # Or padded: f"{key_id:08d}.webp"
-
+            # *** ĐÃ SỬA: Tên file ảnh là số thứ tự khung hình (frame_idx) ***
+            img_name = f"{frame_idx}.webp" 
+            
             full_path = f"{API_BASE_URL}/images/{group_folder}/{video_folder}/{img_name}"
             # logger.debug(f"Generated path for key {key_id}: {full_path}") # Debug log
             return full_path

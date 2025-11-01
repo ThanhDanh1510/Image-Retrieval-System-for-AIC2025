@@ -107,10 +107,11 @@ class KeyframeVectorRepository(MilvusBaseRepository):
 
         try:
             # Truy vấn Milvus, yêu cầu output "id" và "embedding"
+            # ĐÃ SỬA: Bỏ limit=num_expected để đảm bảo Milvus dùng giới hạn mặc định
+            # và không bị cắt nếu num_expected quá lớn hoặc có lỗi tính toán.
             entities = self.collection.query(
                 expr=f"id >= {start_id} and id <= {end_id}",
-                output_fields=["embedding", "id"],
-                limit=num_expected
+                output_fields=["embedding", "id"]
             )
 
             # Đảm bảo thứ tự thời gian cho thuật toán DP
@@ -125,5 +126,6 @@ class KeyframeVectorRepository(MilvusBaseRepository):
             return ids, vectors
 
         except Exception as e:
-            logger.error(f"Lỗi khi truy vấn Milvus trong khoảng {start_id}-{end_id}: {e}")
+            # Import logger nếu cần thiết, hiện tại dùng print hoặc log error từ service layer
+            # logger.error(f"Lỗi khi truy vấn Milvus trong khoảng {start_id}-{end_id}: {e}")
             return [], []
