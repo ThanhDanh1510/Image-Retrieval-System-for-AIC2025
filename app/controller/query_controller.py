@@ -3,11 +3,13 @@ from pathlib import Path
 import json
 import os
 import sys
-from fastapi import UploadFile # <<< THÊM 1: Import UploadFile
-from PIL import Image         # <<< THÊM 2: Import Image
-import io                     # <<< THÊM 3: Import io
+from fastapi import UploadFile
+from PIL import Image
+import io
+import re
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.insert(0, ROOT_DIR)
 
 # Helper ở cấp module: chọn tiền tố theo group_num
 def _prefix_from_group(group_num) -> str:
@@ -37,12 +39,10 @@ def _normalize_group_token(group_token: str) -> str:
 
 sys.path.insert(0, ROOT_DIR)
 
-from service import ModelService, KeyframeQueryService, OcrQueryService
-from schema.response import KeyframeServiceReponse
+from service import ModelService, KeyframeQueryService, OcrQueryService, AsrQueryService
+from schema.response import KeyframeServiceReponse, AsrResultDisplay
 from config import DATA_FOLDER_PATH, API_BASE_URL
 from typing import Optional
-
-
 
 class QueryController:
     def __init__(
@@ -52,8 +52,9 @@ class QueryController:
         model_service: ModelService,
         keyframe_service: KeyframeQueryService,
         ocr_service: OcrQueryService,
+        asr_service: AsrQueryService,
         base_url: str = "http://localhost:8000",
-        rewrite_service: Optional[object] = None,  # NEW: optional injection
+        rewrite_service: Optional[object] = None
     ):
         self.data_folder = DATA_FOLDER_PATH
         self.id2index = json.load(open(id2index_path, 'r'))
@@ -63,10 +64,12 @@ class QueryController:
         self.model_service = model_service
         self.keyframe_service = keyframe_service
         self.ocr_service = ocr_service
+        self.asr_service = asr_service
+        self.asr_service.set_query_controller(self)
         self.base_url = API_BASE_URL
 
         self._rewrite_service = rewrite_service  # NEW
-
+        
     def convert_model_to_path(
         self,
         model: KeyframeServiceReponse
@@ -87,32 +90,47 @@ class QueryController:
         normalized_path = relative_path.replace('\\', '/')
         return f"{self.base_url}/images/{normalized_path}"
 
-    def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
-        relative_path, score = self.convert_model_to_path(model)
-        # Tách video_name và name_img từ model thay vì path
-        prefix = _prefix_from_group(model.group_num)
-        g = int(model.group_num)
-        v = int(model.video_num)
-        ocr_text = getattr(model, 'ocr_text', "")
-        if prefix == "K0":
-            video_name = f"{prefix}{g:01d}_V{v:03d}"
-        else:
-            video_name = f"{prefix}{g:02d}_V{v:03d}"
-             
-        name_img = str(model.keyframe_num)
+    def convert_to_display_result(self, model_or_doc) -> dict:
+        """
+        Hàm linh hoạt, nhận vào Pydantic object hoặc dict từ MongoDB.
+        Luôn trả về `key` là một chuỗi (string).
+        """
+        if isinstance(model_or_doc, dict):
+            key = model_or_doc.get('key')
+            group_num = model_or_doc.get('group_num')
+            video_num = model_or_doc.get('video_num')
+            keyframe_num = model_or_doc.get('keyframe_num')
+            score = model_or_doc.get('confidence_score', 1.0)
+            ocr_text = model_or_doc.get('ocr_text', "")
+        else: # Pydantic object
+            key = model_or_doc.key
+            group_num = model_or_doc.group_num
+            video_num = model_or_doc.video_num
+            keyframe_num = model_or_doc.keyframe_num
+            score = model_or_doc.confidence_score
+            ocr_text = getattr(model_or_doc, 'ocr_text', "")
+
+        prefix = _prefix_from_group(group_num)
+        g_numeric_str = re.sub(r'\D', '', str(group_num))
+        if not g_numeric_str: return {}
+        g = int(g_numeric_str)
+
+        v = int(video_num)
+        kf = int(keyframe_num)
         
-        path = self.get_image_url(relative_path) # Chuyển đổi sang URL ở đây
+        relative_path = f"{prefix}{g}/V{v:03d}/{kf}.webp"
+        video_name = f"{prefix}{g}_V{v:03d}"
+        path = self.get_image_url(relative_path)
+        
         return {
-            "key": str(model.key),  # <<< THÊM DÒNG NÀY ĐỂ FIX LỖI
+            "key": str(key),
             "path": path,
             "video_name": video_name,
-            "name_img": name_img,
-            "score": score, 
+            "name_img": str(kf),
+            "score": score,
             "ocr_text": ocr_text,
         }
         
-
-
     async def search_text_with_exclude_group(
         self,
         query: str,
@@ -135,7 +153,7 @@ class QueryController:
         )
         return raw_result
         
-
+    # --- SEMANTIC SEARCH METHODS ---
     async def search_text(
         self,
         query: str,
@@ -152,57 +170,57 @@ class QueryController:
         return raw_result
 
     # --- OCR SEARCH METHODS ---
-    async def search_ocr(self, query: str, top_k: int):
-        return await self.ocr_service.search_by_text(query, top_k)
+    async def search_ocr(self, query: str, top_k: int, score_threshold: float):
+        """Tìm kiếm OCR đơn giản và lọc theo score."""
+        results = await self.ocr_service.search_by_text(query, top_k)
+        # Áp dụng bộ lọc score ở đây
+        return [res for res in results if res.confidence_score >= score_threshold]
 
-    async def search_ocr_with_exclude_group(
-        self, 
-        query: str, 
-        top_k: int, 
-        list_group_exclude: list[str]  # <<< SỬA 1: Đổi tên tham số
-    ):
-        # 1. Lấy kết quả lớn từ ES
-        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10) # Lấy nhiều hơn để lọc
-        if not es_results: return []
+    async def search_ocr_with_exclude_group(self, query: str, top_k: int, score_threshold: float, exclude_groups: list[str]):
+        """Tìm kiếm OCR loại trừ nhóm và lọc theo score."""
+        # Lấy một lượng lớn kết quả từ Elasticsearch
+        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10)
+        if not es_results: 
+            return []
 
-        # 2. Chuẩn hóa nhóm
-        # <<< SỬA 2: Dùng list_group_exclude
-        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_group_exclude} 
-        
-        # 3. Lấy các ID cần loại trừ từ Mongo
+        # 1. Lọc theo score trước để giảm số lượng cần xử lý
+        scored_results = [res for res in es_results if res["score"] >= score_threshold]
+        if not scored_results:
+            return []
+
+        # 2. Lấy các ID cần loại trừ từ MongoDB
+        groups = {str(int(g)) if g.isdigit() else str(g) for g in exclude_groups}
         repo = self.ocr_service.keyframe_mongo_repo
         docs = await repo.find({"group_num": {"$in": list(groups)}})
         exclude_ids = {d.key for d in docs}
 
-        # 4. Lọc kết quả ES trong Python
-        filtered_es_results = [res for res in es_results if res["id"] not in exclude_ids][:top_k]
-        if not filtered_es_results: return []
+        # 3. Lọc kết quả theo exclude_ids và giới hạn lại top_k
+        filtered_es_results = [res for res in scored_results if res["id"] not in exclude_ids][:top_k]
+        if not filtered_es_results: 
+            return []
 
-        # 5. Lấy data đầy đủ cho các ID đã lọc
+        # 4. Lấy dữ liệu đầy đủ từ MongoDB
         return await self.ocr_service.get_full_keyframe_data(filtered_es_results)
 
-    async def search_ocr_with_selected_video_group(
-        self, 
-        query: str, 
-        top_k: int, 
-        list_of_include_groups: list[str], # <<< SỬA 3: Đổi tên tham số
-        list_of_include_videos: list[int]  # <<< SỬA 4: Đổi tên tham số
-    ):
-        # 1. Lấy kết quả lớn từ ES
-        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10) # Lấy nhiều hơn để lọc
-        if not es_results: return []
+    async def search_ocr_with_selected_video_group(self, query: str, top_k: int, score_threshold: float, include_groups: list[str], include_videos: list[int]):
+        """Tìm kiếm OCR trong nhóm/video được chọn và lọc theo score."""
+        es_results = await self.ocr_service.ocr_repo.search(query, top_k * 10)
+        if not es_results: 
+            return []
 
-        # 2. Chuẩn hóa nhóm
-        # <<< SỬA 5: Dùng list_of_include_groups
-        groups = {str(int(g)) if str(g).isdigit() else str(g) for g in list_of_include_groups}
-        # <<< SỬA 6: Dùng list_of_include_videos
-        videos = set(list_of_include_videos)
+        # 1. Lọc theo score trước
+        scored_results = [res for res in es_results if res["score"] >= score_threshold]
+        if not scored_results:
+            return []
+
+        # 2. Lấy các ID được phép từ MongoDB
+        groups = {str(int(g)) if g.isdigit() else str(g) for g in include_groups}
+        videos = set(include_videos)
         repo = self.ocr_service.keyframe_mongo_repo
         
-        # 3. Lấy các ID được phép từ Mongo
         if not groups and not videos:
-            # Nếu không có bộ lọc, tất cả ID từ ES đều được phép
-            allowed_ids = {res['id'] for res in es_results}
+            # Nếu không có bộ lọc, tất cả các ID đã qua vòng score đều được phép
+            allowed_ids = {res['id'] for res in scored_results}
         else:
             filt = {}
             if groups: filt["group_num"] = {"$in": list(groups)}
@@ -210,11 +228,12 @@ class QueryController:
             docs = await repo.find(filt)
             allowed_ids = {d.key for d in docs}
 
-        # 4. Lọc kết quả ES trong Python
-        filtered_es_results = [res for res in es_results if res["id"] in allowed_ids][:top_k]
-        if not filtered_es_results: return []
+        # 3. Lọc kết quả theo allowed_ids và giới hạn lại top_k
+        filtered_es_results = [res for res in scored_results if res["id"] in allowed_ids][:top_k]
+        if not filtered_es_results: 
+            return []
         
-        # 5. Lấy data đầy đủ
+        # 4. Lấy dữ liệu đầy đủ
         return await self.ocr_service.get_full_keyframe_data(filtered_es_results)
     
     async def search_similar_images(self, key: int, top_k: int):
@@ -285,3 +304,42 @@ class QueryController:
             embedding, top_k, score_threshold, exclude_ids
         )
         return raw_result
+    
+    # --- ASR SEARCH METHODS ---
+    async def search_asr(self, query: str, top_k: int):
+        segments = await self.asr_service.search_by_text(query, top_k)
+        return AsrResultDisplay(results=segments)
+
+    async def search_asr_with_exclude_group(self, query: str, top_k: int, exclude_groups: list[str]):
+        raw_segments = await self.asr_service.asr_repo.search(query, top_k * 5)
+        
+        exclude_groups_set = set(exclude_groups)
+        
+        filtered_segments = [
+            seg for seg in raw_segments 
+            if seg.get("group_num") not in exclude_groups_set
+        ][:top_k]
+        
+        hydrated_segments = await self.asr_service._get_keyframes_for_segments(filtered_segments)
+        return AsrResultDisplay(results=hydrated_segments)
+
+    async def search_asr_with_selected_video_group(self, query: str, top_k: int, include_groups: list[str], include_videos: list[int]):
+        raw_segments = await self.asr_service.asr_repo.search(query, top_k * 10)
+        
+        include_groups_set = set(include_groups)
+        include_videos_set = set(include_videos)
+        
+        if not include_groups_set and not include_videos_set:
+            hydrated_segments = await self.asr_service._get_keyframes_for_segments(raw_segments[:top_k])
+            return AsrResultDisplay(results=hydrated_segments)
+            
+        filtered_segments = []
+        for segment in raw_segments:
+            video_num = int(segment.get("video_name", "_V-1").split('_V')[-1])
+            if (segment.get("group_num") in include_groups_set) or (video_num in include_videos_set):
+                filtered_segments.append(segment)
+            if len(filtered_segments) >= top_k:
+                break
+        
+        hydrated_segments = await self.asr_service._get_keyframes_for_segments(filtered_segments)
+        return AsrResultDisplay(results=hydrated_segments)

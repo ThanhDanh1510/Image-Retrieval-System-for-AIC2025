@@ -23,7 +23,7 @@ from schema.request import (
     TextSearchWithExcludeGroupsRequest,
     TextSearchWithSelectedGroupsAndVideosRequest,
 )
-from schema.response import KeyframeServiceReponse, SingleKeyframeDisplay, KeyframeDisplay
+from schema.response import KeyframeServiceReponse, SingleKeyframeDisplay, KeyframeDisplay, AsrResultDisplay
 # ----------------------------------------
 
 # --- Import Controller and Dependencies ---
@@ -110,22 +110,16 @@ async def search_keyframes_selected_groups_videos(
     return _format_results_for_display(results, controller)
 
 # === OCR SEARCH ENDPOINTS ===
-
 @router.post("/search/ocr", response_model=KeyframeDisplay, summary="Simple OCR Search")
 async def search_keyframes_ocr(
     request: TextSearchRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """Search keyframes based on recognized text content (OCR)."""
-    logger.info(f"OCR search: query='{request.query}', k={request.top_k}")
-    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr(
         query=request.query,
-        top_k=request.top_k
-        # score_threshold=request.score_threshold # REMOVED
+        top_k=request.top_k,
+        score_threshold=request.score_threshold
     )
-    # --- END FIX ---
-    logger.info(f"Found {len(results)} OCR results for query: '{request.query}'")
     return _format_results_for_display(results, controller)
 
 @router.post("/search/ocr/exclude-groups", response_model=KeyframeDisplay, summary="OCR Search with Group Exclusion")
@@ -133,17 +127,12 @@ async def search_keyframes_ocr_exclude_groups(
     request: TextSearchWithExcludeGroupsRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """OCR search excluding specified groups."""
-    logger.info(f"OCR search excluding groups: query='{request.query}', exclude={request.exclude_groups}")
-    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr_with_exclude_group(
         query=request.query,
         top_k=request.top_k,
-        # score_threshold=request.score_threshold, # REMOVED
-        list_group_exclude=request.exclude_groups
+        score_threshold=request.score_threshold,
+        exclude_groups=request.exclude_groups # Đổi tên cho khớp với controller
     )
-    # --- END FIX ---
-    logger.info(f"Found {len(results)} OCR results excluding groups {request.exclude_groups}")
     return _format_results_for_display(results, controller)
 
 @router.post("/search/ocr/selected-groups-videos", response_model=KeyframeDisplay, summary="OCR Search with Group/Video Selection")
@@ -151,18 +140,13 @@ async def search_keyframes_ocr_selected_groups_videos(
     request: TextSearchWithSelectedGroupsAndVideosRequest,
     controller: QueryController = Depends(get_query_controller)
 ):
-    """OCR search within specified groups and videos."""
-    logger.info(f"OCR search selection: query='{request.query}', groups={request.include_groups}, videos={request.include_videos}")
-    # --- 👇 FIX: Removed score_threshold argument 👇 ---
     results = await controller.search_ocr_with_selected_video_group(
         query=request.query,
         top_k=request.top_k,
-        # score_threshold=request.score_threshold, # REMOVED
-        list_of_include_groups=request.include_groups,
-        list_of_include_videos=request.include_videos
+        score_threshold=request.score_threshold,
+        include_groups=request.include_groups,
+        include_videos=request.include_videos
     )
-    # --- END FIX ---
-    logger.info(f"Found {len(results)} OCR results within selected groups/videos")
     return _format_results_for_display(results, controller)
 
 # === SIMILAR IMAGE SEARCH ENDPOINTS ===
@@ -231,3 +215,37 @@ async def rewrite_query_endpoint(
     except Exception as e:
         logger.error(f"Error during query rewrite for '{request.query}': {e}", exc_info=True)
         return RewriteResponse(original_query=request.query, rewritten_query=request.query)
+    
+# --- ASR SEARCH ENDPOINTS ---
+@router.post(
+    "/search/asr",
+    response_model=AsrResultDisplay,
+    summary="Simple ASR Search"
+)
+async def search_keyframes_asr(
+    request: TextSearchRequest,
+    controller: QueryController = Depends(get_query_controller)
+):
+    return await controller.search_asr(request.query, request.top_k)
+
+@router.post(
+    "/search/asr/exclude-groups",
+    response_model=AsrResultDisplay,
+    summary="ASR Search with Group Exclusion"
+)
+async def search_keyframes_asr_exclude_groups(
+    request: TextSearchWithExcludeGroupsRequest,
+    controller: QueryController = Depends(get_query_controller)
+):
+    return await controller.search_asr_with_exclude_group(request.query, request.top_k, request.exclude_groups)
+
+@router.post(
+    "/search/asr/selected-groups-videos",
+    response_model=AsrResultDisplay,
+    summary="ASR Search with Group/Video Selection"
+)
+async def search_keyframes_asr_selected_groups_videos(
+    request: TextSearchWithSelectedGroupsAndVideosRequest,
+    controller: QueryController = Depends(get_query_controller)
+):
+    return await controller.search_asr_with_selected_video_group(request.query, request.top_k, request.include_groups, request.include_videos)

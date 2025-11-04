@@ -44,6 +44,7 @@ from core.settings import KeyFrameIndexMilvusSetting, MongoDBSettings, AppSettin
 from factory.factory import ServiceFactory
 from core.logger import SimpleLogger
 from service.ocr_service import OcrQueryService
+from service.asr_service import AsrQueryService
 from controller.ranking_controller import RankingController # Thêm
 from service import VideoRankingService # Thêm
 
@@ -125,6 +126,8 @@ def get_ocr_service(service_factory: ServiceFactory = Depends(get_service_factor
     """Get OCR query service from ServiceFactory"""
     return service_factory.get_ocr_query_service()
 
+def get_asr_service(factory: ServiceFactory = Depends(get_service_factory)) -> AsrQueryService:
+    return factory.get_asr_query_service()
 
 def get_mongo_client(request: Request):
     """Get MongoDB client from app state"""
@@ -193,6 +196,7 @@ def get_query_controller(
     milvus_settings: KeyFrameIndexMilvusSetting = Depends(get_milvus_settings),
     app_settings: AppSettings = Depends(get_app_settings),
     rewrite_service: Optional[QueryRewriteService] = Depends(get_query_rewrite_service_dep),  # NEW
+    asr_service: AsrQueryService = Depends(get_asr_service)
 ) -> QueryController:
     """Get query controller instance"""
     try:
@@ -217,6 +221,7 @@ def get_query_controller(
             model_service=model_service,
             keyframe_service=keyframe_service,
             ocr_service=ocr_service,
+            asr_service=asr_service,
             rewrite_service=rewrite_service  # NEW: optional injection
         )
 
