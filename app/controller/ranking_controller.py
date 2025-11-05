@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional # Added Optional
 
 from app.service.video_ranking_service import VideoRankingService
-from app.schema.ranking_schemas import VideoRankingRequest, VideoRankingResponse, RankedVideoResult
+from app.schema.ranking_schemas import VideoRankingRequest, VideoRankingResponse, RankedVideoResult, AlignedFrameResult
 from app.config import API_BASE_URL
 from core.logger import SimpleLogger # Use logger
 
@@ -137,9 +137,10 @@ class RankingController:
 
                 group, video = video_id.split('/') # Assume valid video_id format "group/video"
 
-                # --- Generate paths using the UNIQUE KEY IDs ---
-                aligned_paths = [self._get_full_path_from_key(key_id) for key_id in aligned_ids]
-                # --- END ---
+                aligned_frames_list: List[AlignedFrameResult] = []
+                for key_id in aligned_ids:
+                    path = self._get_full_path_from_key(key_id)
+                    aligned_frames_list.append(AlignedFrameResult(key=key_id, path=path))
 
                 # Create the final Pydantic response object
                 result_obj = RankedVideoResult(
@@ -147,8 +148,7 @@ class RankingController:
                     group_num=str(group),
                     video_num=int(video),
                     dp_score=score,
-                    aligned_key_ids=aligned_ids,      # Include the unique IDs
-                    aligned_key_paths=aligned_paths   # Include the generated paths
+                    aligned_frames=aligned_frames_list   # Include the generated paths
                 )
                 final_results.append(result_obj)
 

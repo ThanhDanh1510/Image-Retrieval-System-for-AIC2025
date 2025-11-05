@@ -166,33 +166,41 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
 
               {/* Horizontal scroll for keyframes */}
               <div className="flex flex-row items-center gap-2 pb-2 overflow-x-auto">
-                {videoResult.aligned_key_paths && videoResult.aligned_key_paths.length > 0 ? (
-                  videoResult.aligned_key_paths.map((path, imgIdx) => {
-                    const { video_name, name_img, key } = parseInfoFromPath(path);
-                    const modalData = { // Data to pass to the modal
-                      path: path,
-                      score: videoResult.dp_score, // Use video's DP score
-                      video_name: video_name,
-                      name_img: name_img,
-                      key: key, // Include key for similarity search
-                      rank: idx + 1, // Pass rank to modal if needed
+                {videoResult.aligned_frames && videoResult.aligned_frames.length > 0 ? (
+                  
+                  // 2. Lặp qua 'aligned_frames', mỗi 'frame' là một object { key: ..., path: ... }
+                  videoResult.aligned_frames.map((frame, imgIdx) => {
+                    
+                    // 3. Vẫn dùng parseInfoFromPath để lấy 'name_img' (số frame) từ 'frame.path'
+                    const { video_name, name_img } = parseInfoFromPath(frame.path);
+                    
+                    // 4. Tạo modalData, quan trọng nhất là 'key: frame.key'
+                    const modalData = { 
+                      path: frame.path,               // Lấy path từ 'frame'
+                      score: videoResult.dp_score,    // Lấy score từ 'videoResult'
+                      video_name: video_name,         // Lấy video_name từ 'parseInfo'
+                      name_img: name_img,             // Lấy name_img từ 'parseInfo'
+                      key: frame.key,                 // Lấy ID thật từ 'frame' (QUAN TRỌNG)
+                      rank: idx + 1,
                     };
 
                     return (
                       <div
-                        key={`${videoResult.video_id || idx}-${imgIdx}`} // More specific key
+                        // 5. Dùng 'frame.key' làm key cho React
+                        key={frame.key} 
                         className="relative flex-shrink-0 cursor-pointer group"
-                        onClick={() => openModal(modalData, `Rank #${idx + 1} Video - Frame ${imgIdx + 1}`)} // Pass rank info to modal title
-                        title={`Video: ${video_name}, Frame: ${name_img}`}
+                        // 6. Hàm onClick giờ sẽ gửi 'modalData' với 'key' chính xác
+                        onClick={() => openModal(modalData, `Rank #${idx + 1} Video - Frame ${imgIdx + 1}`)}
+                        title={`Video: ${video_name}, Frame: ${name_img}, Key: ${frame.key}`} // Cập nhật title
                       >
                         <img
-                          src={getImageSrc(path)}
+                          src={getImageSrc(frame.path)} // Dùng 'frame.path'
                           alt={`Aligned keyframe ${imgIdx + 1} for video ${videoResult.video_id}`}
                           className="h-36 w-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 group-hover:scale-110 transition-transform duration-200"
                           onError={handleImageError}
                         />
                         <div className="absolute bottom-1 left-1 bg-black/50 text-white px-1 py-0.5 rounded text-xs font-mono">
-                          {name_img}
+                          {name_img} {/* Hiển thị số frame (name_img) */}
                         </div>
                       </div>
                     );

@@ -10,6 +10,12 @@ class VideoRankingRequest(BaseModel):
     include_groups: Optional[List[str]] = Field(default=None, description="List of group IDs to include")
     include_videos: Optional[List[int]] = Field(default=None, description="List of video IDs to include")
 
+class AlignedFrameResult(BaseModel):
+    """
+    Một đối tượng duy nhất chứa cả key và path của keyframe đã được căn chỉnh.
+    """
+    key: int = Field(..., description="The unique key ID of the aligned keyframe")
+    path: str = Field(..., description="The full URL path to the keyframe image")
 
 class RankedVideoResult(BaseModel):
     video_id: str = Field(..., description="Video identifier (e.g., '19/27')")
@@ -17,11 +23,7 @@ class RankedVideoResult(BaseModel):
     video_num: int = Field(..., description="Video number as integer")
     dp_score: float = Field(..., description="Alignment score from Dynamic Programming")
     
-    # --- SỬA Ở ĐÂY ---
-    # Đảm bảo cả hai trường này đều là List để chứa nhiều keyframe
-    aligned_key_ids: List[int] = Field(..., description="List of aligned keyframe integer IDs (unique keys)")
-    aligned_key_paths: List[str] = Field(..., description="List of full URL paths for the aligned keyframes")
-    # --- KẾT THÚC SỬA ---
+    aligned_frames: List[AlignedFrameResult] = Field(..., description="List of aligned keyframes, each with its unique key and path")
 
 class VideoRankingResponse(BaseModel):
     results: List[RankedVideoResult]
