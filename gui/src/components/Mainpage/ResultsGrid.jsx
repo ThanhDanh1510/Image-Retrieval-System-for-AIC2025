@@ -30,7 +30,6 @@ const parseInfoFromPath = (path) => {
   return { video_name: null, name_img: null, key: key };
 };
 
-
 // Receive `onSimilaritySearch` prop
 export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
   const [selectedResult, setSelectedResult] = useState(null);
@@ -196,7 +195,7 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
                         <img
                           src={getImageSrc(frame.path)} // Dùng 'frame.path'
                           alt={`Aligned keyframe ${imgIdx + 1} for video ${videoResult.video_id}`}
-                          className="h-36 w-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 group-hover:scale-110 transition-transform duration-200"
+                          className="h-24 w-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 group-hover:scale-110 transition-transform duration-200"
                           onError={handleImageError}
                         />
                         <div className="absolute bottom-1 left-1 bg-black/50 text-white px-1 py-0.5 rounded text-xs font-mono">
@@ -216,9 +215,94 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
         )}
       </div>
     );
-  // --- END TRAKE UI ---
+  } else if (mode === "ASR") {
+  // ASR Mode - hiển thị transcript và keyframes
+  const sortedResults = Array.isArray(results) ? results.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)) : [];
+  gridContent = (
+    <div className="space-y-4">
+      {sortedResults.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400 text-center py-4">No ASR results found.</p>
+      ) : (
+        sortedResults.map((asrResult, idx) => {
+          // Lọc keyframes theo timestamp
+          const keyframes = asrResult.representative_keyframes || [];
+
+          return (
+            <div
+              key={`asr-${idx}-${asrResult.video_name}`}
+              className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
+            >
+              {/* Header với Rank, Video, Score, Time Range */}
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-3 flex-wrap">
+                <span className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-2.5 py-1 rounded-full text-sm font-semibold font-mono" title="Rank">
+                  #{idx + 1}
+                </span>
+                <span title="Video ID">{asrResult.video_name}</span>
+                <span className="bg-orange-600 text-white px-3 py-1 rounded-full text-sm font-semibold" title="Score">
+                  Score: {Number(asrResult.score ?? 0).toFixed(2)}
+                </span>
+                <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-mono" title="Time Range">
+                  {asrResult.start_time?.toFixed(1)}s - {asrResult.end_time?.toFixed(1)}s
+                </span>
+              </h3>
+
+              {/* Hiển thị transcript text */}
+              <div className="mb-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">Transcript: </span>
+                  {asrResult.text}
+                </p>
+              </div>
+
+              {/* Horizontal scroll cho keyframes đã lọc */}
+              <div className="flex flex-row items-center gap-2 pb-2 overflow-x-auto">
+                {keyframes.length > 0 ? (
+                  keyframes.map((frame, imgIdx) => {
+                    const { video_name, name_img } = parseInfoFromPath(frame.path);
+                    
+                    const modalData = {
+                      path: frame.path,
+                      score: asrResult.score,
+                      video_name: video_name || asrResult.video_name,
+                      name_img: name_img,
+                      key: frame.key,
+                      rank: idx + 1,
+                      asr_text: asrResult.text,
+                      time_range: `${asrResult.start_time?.toFixed(1)}s - ${asrResult.end_time?.toFixed(1)}s`
+                    };
+
+                    return (
+                      <div
+                        key={frame.key}
+                        className="relative flex-shrink-0 cursor-pointer group"
+                        onClick={() => openModal(modalData, `Rank #${idx + 1} ASR - Frame ${imgIdx + 1}`)}
+                        title={`Video: ${video_name}, Frame: ${name_img}, Key: ${frame.key}`}
+                      >
+                        <img
+                          src={getImageSrc(frame.path)}
+                          alt={`ASR keyframe ${imgIdx + 1} for ${asrResult.video_name}`}
+                          className="h-24 w-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 group-hover:scale-110 transition-transform duration-200"
+                          onError={handleImageError}
+                        />
+                        <div className="absolute bottom-1 left-1 bg-black/50 text-white px-1 py-0.5 rounded text-xs font-mono">
+                          {name_img}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No keyframes found in time segment {asrResult.start_time?.toFixed(1)}s - {asrResult.end_time?.toFixed(1)}s
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+    );
   } else {
-    // Default grid view for Semantic/OCR/Similarity search
     const sortedResults = Array.isArray(results) ? results.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)) : [];
     gridContent = (
        sortedResults.length === 0 ? (

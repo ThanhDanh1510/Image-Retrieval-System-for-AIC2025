@@ -13,6 +13,7 @@ const SEARCH_TYPES = {
   SEMANTIC: 'semantic',
   OCR: 'ocr',
   TRAKE: 'TRAKE', // Tên cho DANTE/TRAKE
+  ASR: 'ASR'
 };
 
 // Định nghĩa các chế độ filter
@@ -98,9 +99,15 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
         return;
       }
       onSubmit?.(events, filterMode, { ...filterOptions, top_k: topK, penalty_weight: Number(penaltyWeight) || 0 }, SEARCH_TYPES.TRAKE);
+    } else if (searchType === SEARCH_TYPES.ASR) {
+    // THÊM ĐIỀU KIỆN MỚI
+    const query = value.trim();
+    if (!query) {
+      window.alert("Please enter audio/speech search query.");
+      return;
     }
-    // Xử lý search Semantic/OCR
-    else {
+    onSubmit?.(query, filterMode, { ...filterOptions, top_k: topK }, SEARCH_TYPES.ASR);
+  } else {
       const query = value.trim();
       if (!query) {
         window.alert(`Please enter text to search (${searchType}).`);
@@ -228,10 +235,17 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
             searchType === SEARCH_TYPES.TRAKE ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
           }`}
         > DANTE </button>
+        {/* Nút ASR */}
+        <button
+          onClick={() => setSearchType(SEARCH_TYPES.ASR)}
+          className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 shadow ${
+            searchType === SEARCH_TYPES.ASR ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+          }`}
+        >ASR</button>
         {/* Nút Upload Image (disable khi chọn DANTE) */}
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={searchType === SEARCH_TYPES.TRAKE}
+          disabled={searchType === SEARCH_TYPES.TRAKE || searchType === SEARCH_TYPES.ASR}
           className="px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors duration-200 bg-green-600 text-white shadow hover:bg-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
           title={searchType === SEARCH_TYPES.TRAKE ? "Upload disabled in DANTE mode" : "Search by uploading an image"}
         > <ArrowUpTrayIcon className="w-4 h-4 inline-block mr-1 sm:mr-2" /> Upload Image </button>
@@ -246,7 +260,7 @@ export default function SearchBar({ onSubmit, onImageSearch, initialMode = "Defa
           ref={textareaRef}
           rows={1}
           placeholder={
-            searchType === SEARCH_TYPES.TRAKE ? "Enter events, one per line..." : `Enter ${searchType} search query...`
+            searchType === SEARCH_TYPES.TRAKE ? "Enter events, one per line..." : searchType === SEARCH_TYPES.ASR ? "Enter audio/speech search query..." : `Enter ${searchType} search query...`
           }
           className="pl-3 pr-32 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-2 shadow-sm sm:text-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring focus:ring-blue-200 dark:focus:ring-blue-600 resize-none overflow-y-auto"
           style={{ minHeight: '42px', maxHeight: '150px' }}

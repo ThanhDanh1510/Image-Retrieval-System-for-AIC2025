@@ -40,7 +40,11 @@ function App() {
     setResults([]); // Clear previous results
     setErrorMsg("");
     // Set grid display mode based on the search type being performed
-    setLastSearchModeForGrid(searchType === 'TRAKE' ? 'TRAKE' : 'Default');
+    setLastSearchModeForGrid(
+      searchType === 'TRAKE' ? 'TRAKE' : 
+      searchType === 'ASR' ? 'ASR' : 
+      'Default'
+    );
 
     let endpoint = "";
     let payload = {};
@@ -58,7 +62,18 @@ function App() {
           ...(extras.include_groups && { include_groups: extras.include_groups }),
           ...(extras.include_videos && { include_videos: extras.include_videos }),
         };
-      } else { // Semantic or OCR
+      } else if (searchType === 'ASR') {
+      // THÊM XỬ LÝ ASR
+      endpoint = `${apiUrl}/api/v1/keyframe/search/asr`;
+      payload = {
+        query: queryOrEvents, // String query
+        top_k: extras.top_k ?? 100,
+        // Include filter options nếu cần
+        ...(extras.exclude_groups && { exclude_groups: extras.exclude_groups }),
+        ...(extras.include_groups && { include_groups: extras.include_groups }),
+        ...(extras.include_videos && { include_videos: extras.include_videos }),
+      };
+    } else { // Semantic or OCR
         // Determine base API path
         let basePath = `${apiUrl}/api/v1/keyframe`; // Start with apiUrl
         basePath += (searchType === 'ocr' ? "/search/ocr" : "/search");
