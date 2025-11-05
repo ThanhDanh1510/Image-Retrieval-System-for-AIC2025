@@ -20,6 +20,7 @@ from models.keyframe import Keyframe
 from core.beit3_processor import load_model_and_processor
 from pymilvus import connections, Collection as MilvusCollection
 from repository.elasticsearch import OcrRepository
+from repository.asr import AsrRepository
 from service.ocr_service import OcrQueryService
 from elasticsearch import AsyncElasticsearch
 
@@ -28,7 +29,7 @@ from typing import Optional  # NEW
 from core.settings import AppSettings  # NEW
 from service.query_rewrite_service import QueryRewriteService  # NEW
 
-from service import KeyframeQueryService, ModelService, VideoRankingService # Thêm VideoRankingService
+from service import KeyframeQueryService, ModelService, OcrQueryService, AsrQueryService, VideoRankingService, QueryRewriteService # Thêm VideoRankingService
 from controller.query_controller import QueryController
 from controller.ranking_controller import RankingController # Thêm RankingController
 from core.settings import AppSettings # Thêm AppSettings
@@ -45,7 +46,8 @@ class ServiceFactory:
         model_checkpoint: str,
         tokenizer_checkpoint: str,
         es_client: AsyncElasticsearch,
-        es_index_name: str,
+        es_ocr_index_name: str,
+        es_asr_index_name: str,
         app_settings: AppSettings, # Thêm app_settings,
         milvus_db_name: str = "default",
         milvus_alias: str = "default",
@@ -70,10 +72,16 @@ class ServiceFactory:
             keyframe_vector_repo=self._milvus_keyframe_repo
         )
         
-        self._ocr_repo = OcrRepository(client=es_client, index_name=es_index_name)
+        self._ocr_repo = OcrRepository(client=es_client, index_name=es_ocr_index_name)
         self._ocr_query_service = OcrQueryService(
             ocr_repo=self._ocr_repo,
             keyframe_mongo_repo=self._mongo_keyframe_repo # Tái sử dụng mongo repo
+        )
+        
+        self._asr_repo = AsrRepository(client=es_client, index_name=es_asr_index_name)
+        self._asr_query_service = AsrQueryService(
+            asr_repo=self._asr_repo,
+            keyframe_mongo_repo=self._mongo_keyframe_repo
         )
 
         # NEW --- Query Rewrite wiring (optional, non-invasive) ---
@@ -121,6 +129,7 @@ class ServiceFactory:
             model_service=self._model_service,
             keyframe_service=self._keyframe_query_service,
             ocr_service=self._ocr_query_service,
+            asr_service=self._asr_query_service,
             rewrite_service=self._query_rewrite_service
         )
 
@@ -174,7 +183,9 @@ class ServiceFactory:
     def get_ocr_query_service(self):
         return self._ocr_query_service
 
-
+    def get_asr_query_service(self):
+        return self._asr_query_service
+    
     # NEW
     def get_query_rewrite_service(self):
         return self._query_rewrite_service

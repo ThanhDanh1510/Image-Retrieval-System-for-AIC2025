@@ -44,6 +44,7 @@ class ElasticsearchSettings(BaseSettings):
     ES_USER: str = Field(..., alias="ES_USER")
     ELASTIC_PASSWORD: str = Field(..., alias="ELASTIC_PASSWORD")
     ES_OCR_INDEX: str = Field(..., alias="ES_OCR_INDEX")
+    ES_ASR_INDEX: str = Field(..., alias="ES_ASR_INDEX")
 
 
 

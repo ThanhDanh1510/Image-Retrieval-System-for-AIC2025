@@ -1,7 +1,5 @@
 # Project-relative path: app/schema/response.py
 from pydantic import BaseModel, Field
-
-from pydantic import BaseModel, Field
 from typing import Optional
 
 # 1. Định nghĩa một lần duy nhất, bao gồm cả ocr_text
@@ -28,3 +26,18 @@ class SingleKeyframeDisplay(BaseModel):
 class KeyframeDisplay(BaseModel):
     """Mô hình response cuối cùng chứa một danh sách kết quả."""
     results: list[SingleKeyframeDisplay]
+    
+# --- ASR Response Models ---
+class AsrSegmentWithKeyframes(BaseModel):
+    """Mô tả một segment ASR tìm thấy và các keyframe đại diện của nó."""
+    text: str
+    score: float
+    video_name: str
+    start_time: float
+    end_time: float
+    total_keyframes_in_segment: int
+    representative_keyframes: list[SingleKeyframeDisplay]
+
+class AsrResultDisplay(BaseModel):
+    """Response cuối cùng cho một tìm kiếm ASR."""
+    results: list[AsrSegmentWithKeyframes]
