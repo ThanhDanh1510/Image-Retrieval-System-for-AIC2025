@@ -1,4 +1,5 @@
 import React, { useState } from "react"; // Import React
+import { useEffect } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import ThemeToggle from "./components/Mainpage/ToggleDarkLight";
 import Sidebar from "./components/Sidebar/Sidebar";

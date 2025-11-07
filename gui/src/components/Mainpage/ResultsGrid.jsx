@@ -36,7 +36,7 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
   const [youtubeLinks, setYoutubeLinks] = useState({});
   const [fpsMap, setFpsMap] = useState({});
   const [showVideo, setShowVideo] = useState(false);
-
+  const [playerCurrentFrame, setPlayerCurrentFrame] = useState(0);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -74,17 +74,65 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
   const closeModal = () => {
     setSelectedResult(null);
     setShowVideo(false);
+    setPlayerCurrentFrame(0); // <-- THÊM DÒNG NÀY
   };
 
+  // === BẮT ĐẦU THAY THẾ: Logic phím 'U' mới ===
   useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === "Escape") closeModal();
+    const handleModalKeydown = (e) => {
+      // 1. Nhấn ESC thì đóng modal
+      if (e.key === "Escape") {
+        closeModal();
+        return; // Dừng lại
+      }
+      
+      // 2. Nhấn 'U' (viết hoa hoặc thường)
+      if (e.key === "u" || e.key === "U") {
+        if (!selectedResult) return; // Đảm bảo modal đang mở
+        e.preventDefault(); // Ngăn trình duyệt gõ chữ 'u'
+
+        // QUYẾT ĐỊNH FRAME SẼ COPY:
+        // - Nếu video đang bật (showVideo = true), dùng frame từ player
+        // - Nếu video đang TẮT, dùng frame gốc của ảnh (logic cũ)
+        const frameToCopy = showVideo 
+          ? playerCurrentFrame // Frame_idx từ player
+          : selectedResult.name_img; // Frame_idx gốc của ảnh
+
+        // Tính toán time_ms tương ứng (dù Sidebar không dùng)
+        const timeMsToCopy = Math.floor(
+            (frameToCopy / (fpsMap[selectedResult.video_name] ?? 30)) * 1000
+        );
+
+        // Chuẩn bị dữ liệu gửi đi
+        const dataToSend = {
+          video_name: selectedResult.video_name || "",
+          name_img: frameToCopy ? frameToCopy.toString() : "", // Gửi frame_idx
+          time_ms: timeMsToCopy
+        };
+
+        // Gửi Custom Event
+        // Sidebar.js vẫn nhận 'name_img' như cũ
+        const copyEvent = new CustomEvent('copyToSidebar', { 
+          detail: dataToSend 
+        });
+        document.dispatchEvent(copyEvent);
+      }
     };
+    
+    // Thêm listener khi modal mở
     if (selectedResult) {
-      document.addEventListener("keydown", handleEsc);
-      return () => document.removeEventListener("keydown", handleEsc);
+      document.addEventListener("keydown", handleModalKeydown);
+      // Xóa listener khi modal đóng
+      return () => document.removeEventListener("keydown", handleModalKeydown);
     }
-  }, [selectedResult]);
+  }, [
+      selectedResult, 
+      fpsMap, 
+      youtubeLinks, 
+      showVideo,           // <-- Thêm
+      playerCurrentFrame   // <-- Thêm
+  ]); 
+  // === KẾT THÚC THAY THẾ ===
 
   // Use a placeholder for broken images
   const placeholderImage = "/placeholder.png"; // Add placeholder.png to your public folder
@@ -115,9 +163,9 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
 
   const getVideoTimeSeconds = (name_img, video_name) => {
     const fps = fpsMap[video_name] ?? 30; // Default to 30 fps
-    const frameNum = parseInt(name_img, 10);
-    if (isNaN(frameNum) || fps <= 0) return 0;
-    return frameNum / fps;
+    const frameNum = parseInt(name_img, 10); //
+    if (isNaN(frameNum) || fps <= 0) return 0; //
+    return frameNum / fps; //
   };
 
   const getVideoIdFromUrl = (url) => {
@@ -400,6 +448,20 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
                     </div>
                   </div>
 
+                  {/* ===== BẮT ĐẦU THAY ĐỔI ===== */}
+                  {/* Thêm ô Time (ms) */}
+                  {selectedResult.name_img && selectedResult.video_name && (
+                    <div>
+                      <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Time (ms)</label>
+                      <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg font-mono text-sm text-gray-900 dark:text-gray-100">
+                        {/* Tính toán time_ms = (frame / fps) * 1000 */}
+                        {Math.floor(getVideoTimeSeconds(selectedResult.name_img, selectedResult.video_name) * 1000)} ms
+                      </div>
+                    </div>
+                  )}
+                  {/* ===== KẾT THÚC THAY ĐỔI ===== */}
+
+
                   {/* Optional OCR Text Display */}
                   {selectedResult?.ocr_text && (
                     <div>
@@ -449,6 +511,7 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
                       videoId={getVideoIdFromUrl(youtubeLinks[selectedResult.video_name])}
                       startSeconds={Math.floor(getVideoTimeSeconds(selectedResult.name_img, selectedResult.video_name))}
                       fps={fpsMap[selectedResult.video_name] ?? 30}
+                      onFrameChange={setPlayerCurrentFrame}
                     />
                   ) : (
                     <p className="text-red-600 dark:text-red-400 text-center py-4">
@@ -464,4 +527,3 @@ export default function ResultsGrid({ results, mode, onSimilaritySearch }) {
     </>
   );
 }
-

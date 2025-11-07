@@ -4,7 +4,7 @@ from typing import List, Optional
 
 class VideoRankingRequest(BaseModel):
     events: List[str] = Field(..., min_length=1, description="List of event descriptions in sequence")
-    top_k: int = Field(default=10, ge=1, le=50, description="Number of top video results to return")
+    top_k: int = Field(default=10, ge=1, le=200, description="Number of top video results to return")
     penalty_weight: Optional[float] = Field(None, ge=0, description="Penalty for gaps between events (optional, uses default if None)")
     exclude_groups: Optional[List[str]] = Field(default=None, description="List of group IDs to exclude")
     include_groups: Optional[List[str]] = Field(default=None, description="List of group IDs to include")

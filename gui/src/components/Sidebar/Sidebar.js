@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import Button from "./Button"; // Giả định bạn có file Button.js
 import SidebarLogo from "./Logo"; // Giả định bạn có file Logo.js
 import { useApi } from "../../hooks/UseAPI"; // Đảm bảo đường dẫn này đúng
@@ -25,6 +26,70 @@ export default SidebarComponent;
 
 const Sidebar = () => {
   const [open, setOpen] = useState(true);
+  // === BẮT ĐẦU THÊM MỚI: Lắng nghe sự kiện phím tắt 'M' ===
+  useEffect(() => {
+    // 1. Định nghĩa hàm xử lý khi nhận được event
+    const handleAutoCopy = (event) => {
+      const { video_name, name_img, time_ms } = event.detail;
+
+      // 2. Lấy taskType *hiện tại* từ state
+      // Hàm này sẽ tự động lấy giá trị state mới nhất
+      setTaskType((currentTaskType) => {
+        
+        // 3. Tự động điền form dựa trên taskType đang chọn
+        if (currentTaskType === "QA") {
+          setVideoID(video_name);
+          setTimeMs(time_ms.toString());
+          setQaAnswer(""); // Xóa câu trả lời cũ
+        } 
+        else if (currentTaskType === "KIS") {
+          setVideoID(video_name);
+          setTimeMs(time_ms.toString());
+          setTimeMsEnd(""); // Reset End time
+        } 
+        else if (currentTaskType === "TRAKE") {
+          setVideoID(video_name);
+          
+          // === BẮT ĐẦU THAY THẾ: Dùng Set để chống duplicate ===
+          setTrakeFrames((currentFrames) => {
+            // 1. Không làm gì nếu frame ID mới là rỗng
+            if (!name_img) {
+              return currentFrames;
+            }
+
+            // 2. Tách các frame hiện tại thành mảng, lọc bỏ rỗng/khoảng trắng
+            const framesArray = currentFrames.split(/[,\s]+/).filter(Boolean);
+
+            // 3. Dùng Set để tự động xử lý tính duy nhất
+            const framesSet = new Set(framesArray);
+
+            // 4. Thêm frame mới vào Set (Nếu đã tồn tại, Set sẽ bỏ qua)
+            framesSet.add(name_img);
+
+            // 5. Chuyển Set trở lại thành chuỗi, nối bằng ", "
+            //    (Array.from để đảm bảo thứ tự)
+            return Array.from(framesSet).join(', ');
+          });
+          // === KẾT THÚC THAY ĐỔI ===
+        }
+        
+        // Phải return giá trị taskType...
+        return currentTaskType; 
+      });
+
+      // Mở sidebar lên nếu nó đang đóng
+      setOpen(true);
+    };
+
+    // 4. Đăng ký listener
+    document.addEventListener('copyToSidebar', handleAutoCopy);
+
+    // 5. Dọn dẹp listener khi component bị hủy
+    return () => {
+      document.removeEventListener('copyToSidebar', handleAutoCopy);
+    };
+  }, []); // [] đảm bảo effect này chỉ chạy 1 lần lúc component mount
+  // === KẾT THÚC THÊM MỚI ===
 
   // === CÁC STATE CHO LOGIC NHẬP LIỆU ===
   const [taskType, setTaskType] = useState("QA"); // "QA", "KIS", "TRAKE"
@@ -48,6 +113,42 @@ const Sidebar = () => {
   } = useApi();
 
   // === HÀM XỬ LÝ SỰ KIỆN ===
+
+  // === BẮT ĐẦU THÊM MỚI: Phím tắt 'I' để xóa inputs ===
+  useEffect(() => {
+    const handleClearInputs = (e) => {
+      // 1. Chỉ chạy nếu phím là 'i' hoặc 'I'
+      if (e.key !== 'i' && e.key !== 'I') {
+        return;
+      }
+
+      // 2. QUAN TRỌNG: Ngăn không cho chạy nếu bạn đang gõ
+      //    bên trong một ô input hoặc textarea.
+      const targetElement = e.target;
+      if (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // 3. Ngăn hành vi mặc định (nếu có)
+      e.preventDefault();
+
+      // 4. Xóa tất cả state của các ô nhập liệu
+      setVideoID("");
+      setTimeMs("");
+      setTimeMsEnd("");
+      setQaAnswer("");
+      setTrakeFrames("");
+    };
+
+    // 5. Đăng ký listener
+    document.addEventListener('keydown', handleClearInputs);
+
+    // 6. Dọn dẹp listener khi component bị hủy
+    return () => {
+      document.removeEventListener('keydown', handleClearInputs);
+    };
+  }, []); // [] đảm bảo effect này chỉ chạy 1 lần lúc component mount
+  // === KẾT THÚC THÊM MỚI ===
 
   // Hàm này gọi performLogin với baseUrl từ state
   const handleLoginClick = () => {

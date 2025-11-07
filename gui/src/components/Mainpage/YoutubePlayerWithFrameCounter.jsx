@@ -2,7 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 
 // Đảm bảo đã tải YouTube API script trước: https://www.youtube.com/iframe_api
 
-export default function YoutubePlayerWithFrameCounter({ videoId, startSeconds, fps }) {
+export default function YoutubePlayerWithFrameCounter({ 
+  videoId, 
+  startSeconds, 
+  fps, 
+  onFrameChange 
+}) {
   const playerRef = useRef(null);
   const [frameIdx, setFrameIdx] = useState(0);
   const [player, setPlayer] = useState(null);
@@ -46,7 +51,7 @@ export default function YoutubePlayerWithFrameCounter({ videoId, startSeconds, f
         player.destroy();
       }
     };
-  }, [videoId, startSeconds]);
+  }, [videoId, startSeconds, player]); // <-- ĐÃ THÊM 'player' VÀO ĐÂY
 
   useEffect(() => {
     if (!player) return;
@@ -55,10 +60,14 @@ export default function YoutubePlayerWithFrameCounter({ videoId, startSeconds, f
       const currentTime = player.getCurrentTime();
       const frame = Math.round(currentTime * fps);
       setFrameIdx(frame);
+
+      if (onFrameChange) {
+        onFrameChange(frame);
+      }
     }, 200); // cập nhật mỗi 200ms
 
     return () => clearInterval(interval);
-  }, [player, fps]);
+  }, [player, fps, onFrameChange]); // (useEffect thứ 2 này đã đúng)
 
   return (
     <div>
