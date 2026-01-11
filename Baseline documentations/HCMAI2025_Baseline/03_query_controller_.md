@@ -1,223 +1,346 @@
-# Chapter 3: Query Controller
+# Chapter 3: Data Access Layer (Repositories)
 
-Welcome back! In [Chapter 2: FastAPI Application Core](02_fastapi_application_core_.md), we learned how our FastAPI application acts as the main "traffic controller," receiving requests from clients and directing them to the correct "route" (like `/api/v1/keyframe/search`). But once a request arrives at its destination route, what happens next? Who actually takes that search query and figures out how to find the keyframes?
+Welcome back! In [Chapter 1: Keyframe Data Model](01_keyframe_data_model_.md), we established the "ID card" for our keyframes, defining their essential structure. Then, in [Chapter 2: Configuration & Settings](02_configuration___settings_.md), we learned how our application gets its "instructions" for things like connecting to databases.
 
-This is where the **Query Controller** comes in! It's the central brain for processing your search requests, acting as a smart intermediary between the incoming API request and the complex internal search services.
+Now, imagine our application needs to actually *use* those instructions to talk to a database. How does it fetch a keyframe's details? Or store a new keyframe? How does it search for keyframes that look similar to each other?
+
+This is where the **Data Access Layer (Repositories)** comes in!
 
 ### What Problem Are We Trying to Solve?
 
-Imagine you send a request to our API: "Find me keyframes of a person walking in the park."
+Imagine our `Image-Retrieval-System` is a bustling library with different types of archives:
 
-The FastAPI router (`keyframe_api.py`) knows it's a search request, but it doesn't know *how* to search. It needs to:
-1.  Understand your query ("person walking in the park").
-2.  Pass this query to a special "search service" that can actually look through millions of keyframes.
-3.  Receive the raw, technical results from that search service (e.g., just key IDs and a score).
-4.  Transform these technical results into something useful and user-friendly, like a list of image URLs and scores.
+*   **MongoDB Archive**: Stores all the basic "ID card" details about our keyframes (like `key`, `video_num`, `group_num`).
+*   **Milvus Archive**: Stores the "visual descriptions" (called **vector embeddings**) of keyframes, which help us find similar images.
+*   **Elasticsearch Archive**: Stores any text extracted from keyframes (like text from OCR or spoken words from ASR).
 
-The `QueryController` handles all these steps. Think of it like a **hotel concierge**. When you ask the concierge for a restaurant recommendation:
-*   You make a request ("Where can I find a good Italian restaurant?").
-*   The concierge understands your request.
-*   They don't cook the food themselves, but they know exactly which restaurants (search services) can fulfill your request. They might even call a few to check availability.
-*   They get the information back.
-*   Then, they present it to you in a clear, easy-to-understand way, perhaps with directions and a brief description (formatted response with image URLs).
+Now, let's say a central part of our application (a "Search Expert") wants to find keyframes. It needs information from *all* these different archives!
 
-The `QueryController` does exactly this for our keyframe search!
+If our Search Expert had to directly learn the complex rules and "languages" for talking to each database (MongoDB, Milvus, Elasticsearch), its job would be extremely difficult. Its code would become long, messy, and hard to manage. What if we wanted to switch from Milvus to a different vector database? We'd have to rewrite all the Search Expert's code!
 
-### The Query Controller's Main Jobs
+This is where the **Data Access Layer (DAL)**, specifically **Repositories**, steps in to simplify everything.
 
-The `QueryController` has three primary responsibilities:
+Think of Repositories as **specialized librarians**. Instead of the Search Expert directly interacting with the different archives, it simply talks to these librarians:
 
-1.  **Translating API Requests**: It takes the plain text search query (and other parameters like `top_k` or `score_threshold`) from the API route and prepares it for the actual search services.
-2.  **Orchestrating Search**: It knows which specialized services to call (e.g., a service to convert text to a "semantic embedding," and another service to search keyframes using that embedding). It coordinates these calls.
-3.  **Formatting Results**: Once the raw keyframe data is found, the controller takes this data and makes it "pretty" for the client. This includes generating the correct **image URLs** for each keyframe and ensuring the final response matches the structure our API expects.
+*   **`KeyframeRepository` (MongoDB Librarian)**: Knows exactly how to get, save, or update a keyframe's basic metadata in the MongoDB Archive.
+*   **`KeyframeVectorRepository` (Milvus Librarian)**: Knows exactly how to search for similar keyframe vectors or fetch a keyframe's vector from the Milvus Archive.
+*   **`OcrRepository` (OCR Text Librarian)**: Knows how to store and search for text extracted from keyframe images in the Elasticsearch Archive.
+*   **`AsrRepository` (ASR Text Librarian)**: Knows how to store and search for text transcribed from audio in the Elasticsearch Archive.
 
-### How Our API Router Uses the Query Controller
+The Search Expert doesn't care *how* these librarians do their job; it just tells them *what* information it needs. This makes our application much cleaner, easier to understand, and more flexible!
 
-Let's revisit a simplified version of our `app/router/keyframe_api.py` file from the previous chapter. Notice how it relies heavily on the `QueryController`:
+### Key Concepts
+
+Our Data Access Layer is built around these core ideas:
+
+1.  **Data Access Layer (DAL)**: This is the general term for the part of our application that handles *all* communication with our databases. It's the "bridge" between our application's logic and where our data is permanently stored.
+2.  **Repositories**: These are specific classes within the DAL. Each repository manages data for a particular type of information (like `Keyframe` metadata or `Keyframe` vectors) and usually interacts with a specific database technology.
+3.  **Databases**:
+    *   **MongoDB**: Stores structured metadata for keyframes.
+    *   **Milvus**: Stores high-dimensional vector embeddings for semantic search.
+    *   **Elasticsearch**: Stores and searches text content (like OCR and ASR).
+
+### How Repositories are Used (The Client's View)
+
+Let's look at how a service that performs searches (like our future `Semantic Search Services` in [Chapter 4: Semantic Search Services](04_semantic_search_services_.md)) would use these repositories. It's simple: the service asks the right librarian for the information it needs.
+
+Imagine our `KeyframeQueryService` needs to perform a semantic search. It would be given access to these "librarians" when it starts up:
 
 ```python
-# File: app/router/keyframe_api.py (simplified)
-from fastapi import APIRouter, Depends
-from schema.request import TextSearchRequest
-from schema.response import KeyframeDisplay, SingleKeyframeDisplay
-from controller.query_controller import QueryController # Our Query Controller!
-from core.dependencies import get_query_controller # How to get it
+# File: app/service/search_service.py (simplified)
+from app.repository.milvus import KeyframeVectorRepository # Milvus Librarian
+from app.repository.mongo import KeyframeRepository # MongoDB Librarian
+from app.repository.elasticsearch import OcrRepository # OCR Text Librarian
 
-router = APIRouter(...)
-
-@router.post("/search", response_model=KeyframeDisplay)
-async def search_keyframes(
-    request: TextSearchRequest,
-    controller: QueryController = Depends(get_query_controller) # FastAPI gives us the controller
-):
-    # 1. Controller handles the actual search logic
-    results = await controller.search_text(
-        query=request.query,
-        top_k=request.top_k,
-        score_threshold=request.score_threshold
-    )
-    
-    # 2. Controller helps format each raw result into a displayable item
-    display_results = []
-    for result in results:
-        display_data = controller.convert_to_display_result(result)
-        display_results.append(SingleKeyframeDisplay(
-            path=display_data["path"],
-            score=display_data["score"]
-        ))
-    
-    return KeyframeDisplay(results=display_results)
+class KeyframeQueryService:
+    def __init__(
+            self,
+            keyframe_vector_repo: KeyframeVectorRepository,
+            keyframe_mongo_repo: KeyframeRepository,
+            ocr_repo: OcrRepository
+        ):
+        self.keyframe_vector_repo = keyframe_vector_repo
+        self.keyframe_mongo_repo = keyframe_mongo_repo
+        self.ocr_repo = ocr_repo
 ```
+Notice how the `KeyframeQueryService` doesn't worry about *connecting* to Milvus or MongoDB. It just receives the already-prepared `KeyframeVectorRepository` and `KeyframeRepository` objects. This approach is called **dependency injection**, which we'll explore in [Chapter 5: Service Factory & Dependency Management](05_service_factory___dependency_management_.md).
 
-In this code:
-*   `controller: QueryController = Depends(get_query_controller)`: This line is magic! FastAPI automatically provides an instance of our `QueryController` to our search function. This is an example of **dependency injection**, a powerful pattern that keeps our code organized. (You'll learn more about `get_query_controller` and dependency management in [Chapter 7: Service Factory & Dependency Management](07_service_factory___dependency_management_.md)).
-*   `results = await controller.search_text(...)`: The router doesn't know *how* to search. It just tells the `controller` to do it. The controller will then talk to other specialized services behind the scenes.
-*   `display_data = controller.convert_to_display_result(result)`: After getting the raw search results, the router asks the `controller` to format each one into something ready for display, specifically generating the correct image URL.
+Now, let's see how this service might use a repository to search for similar keyframes:
 
-### What Happens Inside the Query Controller?
+```python
+# File: app/service/search_service.py (simplified, inside KeyframeQueryService)
 
-Let's peek behind the scenes to see how our "concierge" (`QueryController`) handles a simple text search request.
+    async def find_similar_keyframes(
+        self,
+        query_embedding: list[float], # A numerical "visual description" of what we're looking for
+        max_results: int,
+    ):
+        # 1. Ask the Milvus Librarian to find keyframe IDs with similar visual descriptions
+        #    We first create a "search request" object
+        milvus_request = self.keyframe_vector_repo.create_search_request(
+            embedding=query_embedding,
+            top_k=max_results
+        )
+        # Then, we send the request to the Milvus Librarian
+        milvus_response = await self.keyframe_vector_repo.search_by_embedding(milvus_request)
 
-#### Step-by-Step Flow for a Text Search
+        # 2. Extract the keyframe IDs from the Milvus results
+        found_key_ids = [result.id_ for result in milvus_response.results]
 
-When you ask the `QueryController` to `search_text("person walking", 10, 0.5)`:
+        # 3. Ask the MongoDB Librarian to get the full details for those keyframe IDs
+        keyframe_details = await self.keyframe_mongo_repo.get_keyframe_by_list_of_keys(found_key_ids)
 
-1.  **Receive Request**: The `QueryController` receives your text query and search parameters.
-2.  **Get "Meaning" of Query**: It can't search directly with text. It first needs to understand the *meaning* or *essence* of "person walking." It sends your text query to a special `ModelService` (a text-to-embedding model). This service converts your text into a numerical "vector" (a list of numbers) that represents its semantic meaning.
-3.  **Perform Keyframe Search**: Now, with this numerical vector, the `QueryController` asks the `KeyframeQueryService` (our actual search engine) to find the keyframes that have similar numerical vectors. It tells the service: "Find me the top 10 keyframes that are most similar to this vector, and only if their similarity score is above 0.5."
-4.  **Get Raw Results**: The `KeyframeQueryService` returns a list of raw `KeyframeServiceReponse` objects. These contain the keyframe's `key`, `video_num`, `group_num`, `keyframe_num`, and a `confidence_score` (as we saw in [Chapter 1: Keyframe Data Model](01_keyframe_data_model_.md)).
-5.  **Format for Display**: For each raw keyframe result, the `QueryController` then generates the correct **image path** on the server and converts it into a full **HTTP URL** that a web browser can use to display the image. It also adds other useful information like video and group IDs.
-6.  **Return Formatted Results**: Finally, it returns a list of these beautifully formatted results back to the `FastAPI router`, which then sends them to the client.
+        # 4. Combine and return the results
+        return keyframe_details
+```
+As you can see, the `KeyframeQueryService` makes clear, simple requests (`search_by_embedding`, `get_keyframe_by_list_of_keys`). It doesn't need to know the complex database-specific code hiding inside those repository methods. This keeps the service's code focused and easy to understand!
 
-Here's a simplified diagram of this process:
+### Inside the Data Access Layer (How the Librarians Work)
+
+Let's peek behind the curtain to see how these specialized librarians (repositories) are built and how they actually talk to their respective databases.
+
+When our `KeyframeQueryService` needs data, here's a simplified sequence of what happens:
 
 ```mermaid
 sequenceDiagram
-    participant Client as User/Frontend
-    participant API_Router as FastAPI API Router
-    participant QC as Query Controller
-    participant MS as Model Service
     participant KQS as Keyframe Query Service
+    participant KVR as Keyframe Vector Repository
+    participant MilvusDB as Milvus Database
+    participant KMR as Keyframe Repository
+    participant MongoDB as MongoDB Database
+
+    KQS->>KVR: "Find similar keyframe vectors!" (embedding, top_k)
+    KVR->>MilvusDB: "Search Milvus collection for vectors."
+    MilvusDB-->>KVR: Returns matching Keyframe IDs and similarity scores.
+    KVR-->>KQS: Returns list of (ID, score).
     
-    Client->>API_Router: POST /search (query="person walking")
-    API_Router->>QC: search_text("person walking", ...)
-    QC->>MS: embedding("person walking")
-    MS-->>QC: Returns text embedding (vector)
-    QC->>KQS: search_by_text(embedding, top_k, threshold)
-    KQS-->>QC: Returns raw KeyframeServiceReponse objects
-    QC->>QC: For each result: generate image URL
-    QC-->>API_Router: Returns formatted display results
-    API_Router-->>Client: Sends JSON response with image URLs
+    KQS->>KMR: "Get full details for these Keyframe IDs!" (list of IDs)
+    KMR->>MongoDB: "Find documents in MongoDB by these IDs."
+    MongoDB-->>KMR: Returns full Keyframe data.
+    KMR-->>KQS: Returns list of Keyframe objects.
 ```
 
-#### Diving into the Query Controller Code (`app/controller/query_controller.py`)
+Our project uses a few different types of repositories to talk to our various databases:
 
-Let's look at the key parts of `app/controller/query_controller.py`:
+| Repository Name             | Database       | Role                                                  |
+| :-------------------------- | :------------- | :---------------------------------------------------- |
+| `KeyframeRepository`        | MongoDB        | Manages basic keyframe info (ID, video number, group) |
+| `KeyframeVectorRepository`  | Milvus         | Manages keyframe visual descriptions (embeddings)     |
+| `OcrRepository`             | Elasticsearch  | Manages text extracted from keyframes (OCR)           |
+| `AsrRepository`             | Elasticsearch  | Manages text transcribed from audio (ASR)             |
 
-**1. The `QueryController` Blueprint**
+Let's dive into the code for a couple of these "librarians."
 
-First, the `QueryController` needs to be "built" or "initialized" with the tools it needs to do its job.
+#### 1. Generic MongoDB Repository (`app/common/repository/base.py`)
+
+To avoid writing the same basic MongoDB connection code repeatedly, we have a general helper class called `MongoBaseRepository`. This is like a "general librarian assistant" who knows how to do basic tasks in *any* part of the MongoDB archive.
 
 ```python
-# File: app/controller/query_controller.py (simplified)
-from pathlib import Path
-import json
-# ... other imports ...
+# File: app/common/repository/base.py (simplified)
+from beanie import Document
+from typing import Type, List, Generic, TypeVar
 
-from service import ModelService, KeyframeQueryService
-from config import DATA_FOLDER_PATH, API_BASE_URL
+# BeanieDocument can be any class that we want to store in MongoDB
+BeanieDocument = TypeVar('BeanieDocument', bound=Document)
 
-class QueryController:
-    
-    def __init__(
+class MongoBaseRepository(Generic[BeanieDocument]):
+    def __init__(self, collection: Type[BeanieDocument]):
+        # 'collection' will be our specific Keyframe model from Chapter 1
+        self.collection = collection
+
+    async def find(self, *args, **kwargs) -> list[BeanieDocument]:
+        """
+        Finds documents in the MongoDB collection based on provided rules.
+        Example: await repo.find({"video_num": 10})
+        """
+        # This uses Beanie (our MongoDB helper) to talk to the database
+        return await self.collection.find(*args, **kwargs).to_list(length=None)
+
+    # ... other generic methods for MongoDB ...
+```
+*   `class MongoBaseRepository(Generic[BeanieDocument]):`: This makes our repository "generic." It can work with *any* `BeanieDocument` (like our `Keyframe` model).
+*   `__init__(self, collection: Type[BeanieDocument])`: When we create a `MongoBaseRepository`, we tell it *which specific type of document* (e.g., `Keyframe`) it should manage.
+*   `async def find(...)`: This method directly calls `Beanie`'s `find` method, which then handles the communication with MongoDB.
+
+#### 2. Specific MongoDB Keyframe Repository (`app/repository/mongo.py`)
+
+Now, we create our specialized `KeyframeRepository`. This class knows *only* about `Keyframe` data and provides methods designed specifically for keyframes. This is our dedicated "Keyframe Librarian."
+
+```python
+# File: app/repository/mongo.py (simplified)
+from app.models.keyframe import Keyframe # Our Keyframe model from Chapter 1
+from app.common.repository.base import MongoBaseRepository
+from app.schema.interface import KeyframeInterface # Output format
+
+class KeyframeRepository(MongoBaseRepository[Keyframe]):
+    def __init__(self):
+        # We tell the base class that this repository works with our Keyframe model
+        super().__init__(Keyframe)
+
+    async def get_keyframe_by_list_of_keys(self, keys: list[int]):
+        """
+        Finds keyframe documents in MongoDB using a list of their unique 'key' IDs.
+        Example: await repo.get_keyframe_by_list_of_keys([101, 105, 203])
+        """
+        # Uses the 'find' method from our base MongoBaseRepository
+        result = await self.find({"key": {"$in": keys}}) # MongoDB query to find keys
+
+        # Convert the raw database results into a clean KeyframeInterface format
+        return [
+            KeyframeInterface(
+                key=k.key, video_num=k.video_num,
+                group_num=k.group_num, keyframe_num=k.keyframe_num
+            ) for k in result
+        ]
+    # ... other specific methods like get_keyframe_by_video_num ...
+```
+*   `class KeyframeRepository(MongoBaseRepository[Keyframe]):`: This line shows that our `KeyframeRepository` *inherits* from `MongoBaseRepository`, specializing it for `Keyframe` documents.
+*   `__init__(self):`: We call `super().__init__(Keyframe)` to initialize the base class with our `Keyframe` model.
+*   `async def get_keyframe_by_list_of_keys(...)`: This is a custom method. It uses the `self.find` method (from `MongoBaseRepository`) with a special MongoDB filter (`{"key": {"$in": keys}}`) to retrieve only the keyframes whose `key` is in the provided list.
+*   Finally, it converts the raw `Keyframe` database objects into cleaner `KeyframeInterface` objects, ensuring a consistent output format for the services.
+
+#### 3. Generic Milvus Repository (`app/common/repository/base.py`)
+
+Just like MongoDB, we have a base class for interacting with Milvus. This `MilvusBaseRepository` provides the basic tools for any Milvus collection. This is our "general Vector Librarian Assistant."
+
+```python
+# File: app/common/repository/base.py (simplified)
+from abc import ABC # Helps define abstract classes
+from pymilvus import Collection as MilvusCollection # Milvus library
+
+class MilvusBaseRepository(ABC): # ABC means this is an abstract class, not meant to be used directly
+    def __init__(self, collection: MilvusCollection):
+        # 'collection' will be our specific Milvus collection object (e.g., 'keyframes_vectors')
+        self.collection = collection
+```
+*   `class MilvusBaseRepository(ABC):`: `ABC` means this class is a blueprint; you can't create an object directly from it. You must create a more specific class that inherits from it.
+*   `__init__(self, collection: MilvusCollection)`: When a Milvus repository is created, it's given the actual `MilvusCollection` object, which represents our direct connection to a specific collection in the Milvus database.
+
+#### 4. Specific Milvus Keyframe Vector Repository (`app/repository/milvus.py`)
+
+Our `KeyframeVectorRepository` is the dedicated "Keyframe Vector Librarian." It extends `MilvusBaseRepository` and provides methods to search and retrieve keyframe vectors in Milvus.
+
+```python
+# File: app/repository/milvus.py (simplified)
+from app.common.repository.base import MilvusBaseRepository
+from pymilvus import Collection as MilvusCollection
+from app.schema.interface import MilvusSearchRequest, MilvusSearchResponse # Data structures
+
+class KeyframeVectorRepository(MilvusBaseRepository):
+    def __init__(self, collection: MilvusCollection, search_params: dict):
+        super().__init__(collection) # Initialize the base class
+        self.search_params = search_params # Milvus search settings
+
+    async def search_by_embedding(
         self,
-        data_folder: Path, # Path to where images are stored
-        id2index_path: Path, # A mapping file
-        model_service: ModelService, # To get text embeddings
-        keyframe_service: KeyframeQueryService, # To search keyframes
-        base_url: str = "http://localhost:8000" # Base URL for images
-    ):
-        self.data_folder = DATA_FOLDER_PATH
-        self.id2index = json.load(open(id2index_path, 'r')) # Loads a dictionary
-        self.model_service = model_service # Store the ModelService
-        self.keyframe_service = keyframe_service # Store the KeyframeQueryService
-        self.base_url = API_BASE_URL
+        request: MilvusSearchRequest # Contains the query vector, how many results (top_k), etc.
+    ) -> MilvusSearchResponse:
+        """
+        Performs a vector similarity search in Milvus to find similar keyframes.
+        Example: await repo.search_by_embedding(my_search_request)
+        """
+        # This is the actual call to Milvus to perform the search!
+        search_results = self.collection.search(
+            data=[request.embedding], # The numerical query (our "visual description")
+            anns_field="embedding", # The field in Milvus that stores vectors
+            param=self.search_params, # Milvus search parameters (e.g., algorithm to use)
+            limit=request.top_k, # How many results to return
+            output_fields=["id", "embedding"], # What information to get back
+        )
+
+        # Process Milvus's raw search results into our structured MilvusSearchResponse
+        results = []
+        for hits in search_results:
+            for hit in hits:
+                results.append(
+                    MilvusSearchResult(
+                        id_=hit.id,
+                        distance=hit.distance, # How similar it is (lower is better)
+                        embedding=hit.entity.get("embedding")
+                    )
+                )
+        return MilvusSearchResponse(results=results, total_found=len(results))
 ```
+*   `class KeyframeVectorRepository(MilvusBaseRepository):`: Inherits from `MilvusBaseRepository`.
+*   `__init__(self, collection: MilvusCollection, search_params: dict)`: It takes the specific Milvus `collection` object and some `search_params` (configuration for how Milvus should search).
+*   `async def search_by_embedding(...)`: This is the core method. It takes a `MilvusSearchRequest` (which includes the query vector from our `Semantic Search Services`) and then directly calls `self.collection.search(...)` to interact with the Milvus database.
+*   The raw results from Milvus are then neatly packaged into our custom `MilvusSearchResponse` objects, making them easy for services to use.
 
-*   **`__init__`**: This is a special Python method that runs when a `QueryController` object is created. It takes in various pieces of information and other services (`ModelService`, `KeyframeQueryService`) that it will need later. This is how it gets its "tools" to work.
-*   `ModelService` and `KeyframeQueryService`: These are the specialized "departments" that the concierge (`QueryController`) will talk to. We'll explore them in more detail in [Chapter 5: Semantic Search Services](05_semantic_search_services_.md).
+#### 5. Elasticsearch Repositories (`app/repository/elasticsearch.py` and `app/repository/asr.py`)
 
-**2. Handling a Text Search**
+We also have specialized repositories for text searching using Elasticsearch. These "librarians" know how to store and retrieve text-based information.
 
-This is the core method that performs the search orchestration:
+Here's a look at the OCR text librarian:
 
 ```python
-# File: app/controller/query_controller.py (simplified)
-# ... (inside QueryController class) ...
+# File: app/repository/elasticsearch.py (simplified)
+from elasticsearch import AsyncElasticsearch # Elasticsearch library
 
-    async def search_text(
-        self, 
-        query: str, # The text you want to search for
-        top_k: int, # How many results you want
-        score_threshold: float # Minimum relevance score
-    ):
-        # 1. Convert text query into a numerical vector (embedding)
-        embedding = self.model_service.embedding(query).tolist()[0]
-        
-        # 2. Use the KeyframeQueryService to find similar keyframes
-        raw_result = await self.keyframe_service.search_by_text(
-            embedding, top_k, score_threshold
+class OcrRepository:
+    def __init__(self, client: AsyncElasticsearch, index_name: str):
+        self.client = client # The Elasticsearch connection
+        self.index_name = index_name # The specific "folder" in Elasticsearch
+
+    async def search(self, query: str, top_k: int) -> list[dict]:
+        """
+        Performs a text search in Elasticsearch for OCR content.
+        Example: await repo.search("stop sign", 5)
+        """
+        resp = await self.client.search(
+            index=self.index_name,
+            query={"match": {"text": {"query": query, "analyzer": "vi_analyzer"}}},
+            size=top_k
         )
-        
-        # 3. Return the raw search results (list of KeyframeServiceReponse objects)
-        return raw_result
+        results = []
+        for hit in resp['hits']['hits']:
+            # Extract relevant info from Elasticsearch's response
+            results.append({
+                "id": int(hit['_id']),
+                "score": hit['_score'],
+                "text": hit['_source'].get('text', '')
+            })
+        return results
 ```
+*   `OcrRepository`: This class takes an Elasticsearch client and an `index_name` (like a collection in MongoDB).
+*   `async def search(...)`: It uses the `self.client.search` method to query Elasticsearch, looking for `query` text within the `text` field, and specifies how many `top_k` results to return.
 
-*   `embedding = self.model_service.embedding(query).tolist()[0]`: Here, the controller asks the `model_service` to convert the `query` text into an "embedding" (a list of numbers).
-*   `raw_result = await self.keyframe_service.search_by_text(...)`: With the embedding ready, the controller then calls the `keyframe_service` to perform the actual search. Notice the `await` keyword, indicating these are asynchronous operations – they might take some time, and our application can do other things while waiting.
-
-**3. Formatting Results and Generating Image URLs**
-
-After `search_text` returns the raw `KeyframeServiceReponse` objects, the `QueryController` also has methods to format them into displayable information, including generating the image URLs.
+The `AsrRepository` (for text from audio) works in a very similar way, just targeting a different "index" (folder) in Elasticsearch:
 
 ```python
-# File: app/controller/query_controller.py (simplified)
-# ... (inside QueryController class) ...
+# File: app/repository/asr.py (simplified)
+from elasticsearch import AsyncElasticsearch
 
-    def get_image_url(self, relative_path: str) -> str:
-        """Convert a relative file path (like 'L01/V005/...') into a full HTTP URL."""
-        normalized_path = relative_path.replace('\\', '/') # Fix path separators
-        # Combines base URL (e.g., http://localhost:8000) with /images and the path
-        return f"{self.base_url}/images/{normalized_path}"
-    
-    def convert_to_display_result(self, model: KeyframeServiceReponse) -> dict:
-        """Converts a raw KeyframeServiceReponse into a dictionary ready for display."""
-        # Example: L02/V005/00012345.webp
-        relative_path = (
-            f"L{model.group_num:02d}/V{model.video_num:03d}/{model.keyframe_num:08d}.webp"
+class AsrRepository:
+    def __init__(self, client: AsyncElasticsearch, index_name: str):
+        self.client = client
+        self.index_name = index_name
+
+    async def search(self, query: str, top_k: int) -> list[dict]:
+        """
+        Performs a text search in Elasticsearch for ASR (audio-to-text) content.
+        """
+        resp = await self.client.search(
+            index=self.index_name,
+            query={"match": {"text": {"query": query, "analyzer": "vi_analyzer"}}},
+            size=top_k
         )
-        
-        return {
-            "path": self.get_image_url(relative_path), # This calls the function above!
-            "score": model.confidence_score,
-            "video_id": model.video_num,
-            "group_id": model.group_num,
-            "keyframe_id": model.keyframe_num
-        }
+        results = []
+        for hit in resp['hits']['hits']:
+            source = hit['_source']
+            source['score'] = hit['_score']
+            results.append(source)
+        return results
 ```
-
-*   `get_image_url`: This method is crucial. It takes a relative path (like "L01/V005/00012345.webp") and combines it with our `base_url` (e.g., `http://localhost:8000`) and the `/images` prefix (which we set up in [Chapter 2: FastAPI Application Core](02_fastapi_application_core_.md) to serve static files). The result is a full URL like `http://localhost:8000/images/L01/V005/00012345.webp`, which a web browser can use to fetch and display the actual keyframe image.
-*   `convert_to_display_result`: This method uses the information from the `KeyframeServiceReponse` object to build the `relative_path` and then uses `get_image_url` to get the final displayable path. It then packages all relevant information into a dictionary, ready to be sent back to the client.
+As you can see, both Elasticsearch repositories follow a similar pattern, providing a clean interface for services to perform text searches without worrying about the underlying Elasticsearch query language.
 
 ### Conclusion
 
-In this chapter, we've explored the vital role of the **Query Controller** in our `HCMAI2025_Baseline` project. We learned that it acts as the "concierge" of our search system, elegantly bridging the gap between raw API requests and the complex logic of our internal search services.
+In this chapter, we've explored the crucial **Data Access Layer (Repositories)**, which is responsible for all interactions with our databases. We learned that:
 
-Specifically, the `QueryController` is responsible for:
-*   Translating incoming API requests into a format understood by our search services.
-*   Orchestrating the search process by calling specialized services like the `ModelService` and `KeyframeQueryService`.
-*   Formatting the raw search results into a clean, user-friendly response, including generating the correct image URLs.
+*   Repositories act as **specialized librarians** for our data, abstracting away the complexities of specific database technologies (MongoDB for metadata, Milvus for vector embeddings, Elasticsearch for text search).
+*   This abstraction keeps our application's `Semantic Search Services` (which we'll cover next!) focused on their core logic, making the code cleaner, more maintainable, and easier to adapt to future database changes.
+*   We use generic base classes like `MongoBaseRepository` and `MilvusBaseRepository` to provide common operations, and then specialized `KeyframeRepository`, `KeyframeVectorRepository`, `OcrRepository`, and `AsrRepository` classes for our specific data needs.
 
-This clear separation of concerns keeps our API routes simple and makes our core search logic manageable and easy to understand. Now that we understand how requests are processed, the next crucial step is to understand how our application gets all its necessary information, like database connection strings or image paths. This is what we'll explore in the next chapter, where we dive into **Configuration & Settings**!
+Now that we understand how our application talks to its databases, the next step is to combine this with our Keyframe Data Model and Configuration to build the intelligent services that actually perform the semantic search!
 
-[Next Chapter: Configuration & Settings](04_configuration___settings_.md)
+[Next Chapter: Semantic Search Services](04_semantic_search_services_.md)
