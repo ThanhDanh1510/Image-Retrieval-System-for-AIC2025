@@ -1,355 +1,290 @@
-# Chapter 7: Service Factory & Dependency Management
+# Chapter 7: FastAPI Application Core
 
-Welcome back! In [Chapter 6: Data Access Layer (Repositories)](06_data_access_layer__repositories__.md), we saw how our repositories act as specialized librarians, neatly handling all interactions with our MongoDB and Milvus databases. We learned that the `KeyframeQueryService` (our "Expert Detective") asks these repositories for data without needing to know *how* they talk to the databases.
+Welcome back! In [Chapter 6: Query Controller](06_query_controller_.md), we learned how our "concierge" (the Query Controller) efficiently orchestrates complex search requests by calling various specialized services and formatting the results. But how does a user or another application actually *send* a search request to our system in the first place? And how does our system listen for these requests, direct them to the right place, and then send back the answer across the internet?
 
-But this raises an important question: When our application starts, who creates these "librarians" (`KeyframeRepository`, `KeyframeVectorRepository`), the "translator" (`ModelService`), the "detective" (`KeyframeQueryService`), and the "concierge" (`QueryController`)? And once they are created, how does every part of our application that needs them get access to the *same, correctly configured* instance without having to create a new one every single time?
-
-This is where the **Service Factory & Dependency Management** come into play!
+This is where the **FastAPI Application Core** comes in! It's the central control center, like the "waiter and menu" of our entire web service. It's the front door that listens for all incoming requests (e.g., a user searching for keyframes), directs them to the right internal "chef" (our Query Controller), and then sends back structured responses, ensuring everyone understands each other.
 
 ### What Problem Are We Trying to Solve?
 
-Imagine you're running a busy restaurant. You need many specialized tools: ovens, blenders, knives, and various ingredients.
+Imagine our entire `Image-Retrieval-System` is a powerful, high-tech kitchen. We have all the amazing "ingredients" (keyframes, embeddings), "recipes" (semantic search logic), and "specialist chefs" (ModelService, KeyframeQueryService) neatly organized and managed by our "kitchen manager" (Service Factory) and "concierge" (Query Controller).
 
-*   **Problem 1: Setting up the Kitchen**: You don't want chefs to build an oven from scratch every time they need to bake something. You need a central **factory** or a **kitchen manager** to ensure all the right tools are purchased, assembled, and ready *before* the restaurant opens. This is what our `ServiceFactory` does for our application.
-*   **Problem 2: Giving Tools to Chefs**: When a chef (our API route or controller) needs a blender, they don't go buy one themselves. They just ask the kitchen manager, "Hey, I need the blender for this soup!" The kitchen manager (our **dependency management system**) provides the *already prepared* blender. The chef can then focus on making soup, not on finding and setting up tools. This is what FastAPI's `Depends` system and our `ServiceFactory` together enable.
+But how do customers *order* their meals? How do they communicate what they want? And once the meal is prepared, how is it delivered back to them?
 
-Without this system, every time an API request comes in, our application might try to:
-*   Connect to a database.
-*   Load an AI model into memory.
-*   Create new instances of services.
+This is the problem the **FastAPI Application Core** solves. It provides:
 
-Doing this for *every single request* would be incredibly slow and wasteful! Our goal is to set up everything once when the application starts and then efficiently provide these ready-to-use components wherever they're needed.
+1.  **A Menu (API Endpoints)**: A clear list of what services our system offers (like "search keyframes by text," "find similar images," etc.), each with its own specific "order form" (request format).
+2.  **A Waiter (FastAPI Framework)**: Who listens for customer orders (incoming requests), takes them to the right chef (our Query Controller), waits for the food (search results), and then delivers it back to the customer.
+3.  **A Host (CORS)**: Who ensures that customers from different "restaurants" (other websites or applications) are welcome and can safely communicate with our kitchen.
+4.  **A Kitchen Manager (Lifespan Events)**: Who ensures the kitchen is fully set up and ready to serve *before* the first customer arrives (connecting databases, loading AI models) and cleans up gracefully when the restaurant closes.
 
-### Key Concepts
+Without the FastAPI Application Core, our powerful search system would be like a fantastic restaurant with no waiters, no menu, and no way for customers to order!
 
-Let's break down the main ideas:
+### Key Concepts of Our Application Core
 
-1.  **Service Factory (`ServiceFactory`)**:
-    *   **What it is**: A dedicated class that knows how to create and configure *all* the different services and repositories our application needs (like `ModelService`, `KeyframeQueryService`, `KeyframeRepository`, etc.).
-    *   **Why we use it**: It centralizes the creation logic. If a service needs other services to work, the factory knows how to put them together correctly. It's like the master builder for our application's components.
-    *   **Lifecycle**: We create *one* instance of this factory when the application starts up.
+Let's break down the essential ideas behind this core component.
 
-2.  **Lifespan (`lifespan` function)**:
-    *   **What it is**: A special feature in FastAPI that allows us to run code *before* the application starts handling requests (startup events) and *after* it stops (shutdown events).
-    *   **Why we use it**: This is the perfect place to create our `ServiceFactory` (and also establish database connections). It ensures our factory is ready and available throughout the application's entire life. When the app shuts down, `lifespan` also cleans up, like closing database connections.
+1.  **FastAPI**: This is a modern, high-performance Python framework we use specifically for building web APIs. It's incredibly fast, easy to use, and a joy for developers because it automatically generates interactive documentation for your API!
+2.  **API Endpoints (Routes)**: These are specific URLs on our server that perform particular actions. Think of them as individual menu items.
+    *   `/api/v1/keyframe/search` is the endpoint for a text-based keyframe search.
+    *   `/health` is a simple endpoint to check if our service is running correctly.
+3.  **Requests & Responses**: When a client (like your web browser or another app) wants something, it sends a **request** to one of our API endpoints. Our FastAPI application processes this request and sends back a **response**, which usually contains the data the client asked for (like a list of keyframe results) or an error message.
+4.  **CORS (Cross-Origin Resource Sharing)**: This is a security feature built into web browsers. When a website (e.g., your frontend app at `my-app.com`) tries to talk to an API on a *different* website (e.g., our API at `api.image-search.com`), browsers normally block this for security. CORS is a mechanism that allows us to explicitly tell browsers, "It's okay for `my-app.com` to talk to me!"
+5.  **Lifespan Events**: These are special moments in our application's life: right before it starts accepting requests ("startup") and right after it stops ("shutdown"). We use these moments to set up crucial resources (like database connections and AI models) and clean them up afterward.
 
-3.  **Dependency Management (FastAPI `Depends`)**:
-    *   **What it is**: A powerful pattern where a component (e.g., an API route function) declares what "dependencies" (other services or objects) it needs, and the framework (FastAPI) automatically provides them.
-    *   **Why we use it**: It keeps our code clean, organized, and easy to test. An API route doesn't need to know *how* to create a `QueryController`; it just says "I need a `QueryController`," and FastAPI (with the help of our factory) hands one over. It's like asking for a tool from a shared toolbox.
+### Setting Up Our Main Application: `app/main.py`
 
-### How it All Works Together: The Central Assembly Line
+The very heart of our FastAPI application lives in `app/main.py`. This file is responsible for creating the main FastAPI application instance and attaching all the necessary middleware and routes.
 
-Let's trace the journey of setting up and using our application's tools, focusing on how an API request for a keyframe search (like `/api/v1/keyframe/search`) eventually gets its `QueryController` and all its underlying services.
-
-```mermaid
-sequenceDiagram
-    participant Startup as FastAPI Startup (Lifespan)
-    participant SF as ServiceFactory
-    participant Settings as Configuration Settings
-    participant MongoRepo as KeyframeRepository (MongoDB)
-    participant MilvusRepo as KeyframeVectorRepository (Milvus)
-    participant ModelSvc as ModelService
-    participant KeyframeSvc as KeyframeQueryService
-    participant API_Request as Incoming API Request
-    participant FastAPI as FastAPI Framework
-    participant DepFunc as Dependency Functions (core/dependencies.py)
-    participant QueryCtrl as QueryController
-    participant API_Route as API Route (keyframe_api.py)
-
-    Startup->>Settings: Load all app, mongo, milvus settings
-    Startup->>SF: Create ServiceFactory (with all settings)
-    SF->>MongoRepo: SF creates KeyframeRepository
-    SF->>MilvusRepo: SF creates KeyframeVectorRepository (connects to Milvus)
-    SF->>ModelSvc: SF creates ModelService (loads AI model)
-    SF->>KeyframeSvc: SF creates KeyframeQueryService (gives it MongoRepo & MilvusRepo)
-    Startup->>FastAPI: Store SF and other core objects in app.state
-    Startup-->>FastAPI: Application ready, start handling requests
-
-    API_Request->>FastAPI: POST /api/v1/keyframe/search
-    FastAPI->>API_Route: Call search_keyframes(..., controller=Depends(get_query_controller))
-    API_Route->>DepFunc: Ask for QueryController (via get_query_controller)
-    DepFunc->>FastAPI: Get ServiceFactory from app.state
-    DepFunc->>SF: Ask SF for ModelService
-    SF-->>DepFunc: Provide ModelService instance
-    DepFunc->>SF: Ask SF for KeyframeQueryService
-    SF-->>DepFunc: Provide KeyframeQueryService instance
-    DepFunc->>QueryCtrl: Create QueryController (giving it ModelService & KeyframeQueryService)
-    QueryCtrl-->>DepFunc: Return QueryController instance
-    DepFunc-->>API_Route: Provide QueryController instance
-    API_Route->>QueryCtrl: Use QueryController to search
-    QueryCtrl-->>API_Route: Return search results
-    API_Route-->>API_Request: Return JSON response
-```
-
-Let's break this down into the specific files and code.
-
-### 1. The Service Factory (`app/factory/factory.py`)
-
-This is the blueprint for our "central assembly line." It knows how to put together all the pieces.
+Here’s a simplified look at the crucial parts of `app/main.py`:
 
 ```python
-# File: app/factory/factory.py (simplified)
-import open_clip
-from pymilvus import connections, Collection as MilvusCollection
-# ... other imports for services and repositories ...
+# File: app/main.py (simplified)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # To serve actual images
 
-from repository.mongo import KeyframeRepository
-from repository.milvus import KeyframeVectorRepository
-from service import KeyframeQueryService, ModelService
-from models.keyframe import Keyframe # From Chapter 1
+from core.lifespan import lifespan # Our startup/shutdown handler
+from router import keyframe_api # Our keyframe-specific routes
 
-class ServiceFactory:
-    def __init__(
-        self,
-        milvus_collection_name: str,
-        milvus_host: str,
-        milvus_port: str,
-        model_name: str,
-        mongo_collection=Keyframe,
-        # ... other settings like milvus_search_params, user, password ...
-    ):
-        # 1. Create the MongoDB Repository (needs the Keyframe model)
-        self._mongo_keyframe_repo = KeyframeRepository(collection=mongo_collection)
-        
-        # 2. Create and connect the Milvus Repository
-        self._milvus_keyframe_repo = self._init_milvus_repo(
-            collection_name=milvus_collection_name,
-            host=milvus_host,
-            port=milvus_port,
-            # ... pass other milvus settings ...
-        )
+# 1. Create the main FastAPI application instance
+app = FastAPI(
+    title="Keyframe Search API",
+    description="A powerful semantic search API for video keyframes...",
+    version="1.0.0",
+    lifespan=lifespan # Link to our startup/shutdown logic!
+)
 
-        # 3. Create the Model Service (loads the AI model for embeddings)
-        self._model_service = self._init_model_service(model_name)
+# 2. Configure CORS middleware (the "Host" welcoming other sites)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # For simplicity, allow all. In production, list specific domains.
+    allow_methods=["*"], # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"], # Allow all headers
+)
 
-        # 4. Create the Keyframe Query Service (needs both repositories)
-        self._keyframe_query_service = KeyframeQueryService(
-            keyframe_mongo_repo=self._mongo_keyframe_repo,
-            keyframe_vector_repo=self._milvus_keyframe_repo
-        )
+# 3. Include our specific API routes (the "Menu" items)
+app.include_router(keyframe_api.router, prefix="/api/v1") # All routes here start with /api/v1
 
-    def _init_milvus_repo(
-        self, collection_name: str, host: str, port: str, # ...
-    ):
-        # Connect to Milvus database using configuration
-        connections.connect(alias="default", host=host, port=port)
-        # Get the specific Milvus collection
-        collection = MilvusCollection(collection_name, using="default")
-        # Return our Milvus Repository
-        return KeyframeVectorRepository(collection=collection, search_params={})
-
-    def _init_model_service(self, model_name: str):
-        # Load the AI model and tokenizer
-        model, _, preprocess = open_clip.create_model_and_transforms(model_name)
-        tokenizer = open_clip.get_tokenizer(model_name)
-        # Return our Model Service
-        return ModelService(model=model, preprocess=preprocess, tokenizer=tokenizer)
-
-    def get_model_service(self):
-        """Provides the already created ModelService instance."""
-        return self._model_service
-
-    def get_keyframe_query_service(self):
-        """Provides the already created KeyframeQueryService instance."""
-        return self._keyframe_query_service
-
-    # ... other getter methods for repositories ...
+# 4. Mount a directory to serve static image files
+IMAGES_DIR = "images" # Assuming an 'images' folder in the project root
+if os.path.exists(IMAGES_DIR):
+    app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+    # This means images at 'images/L01/V005/123.webp' can be accessed via /images/L01/V005/123.webp
 ```
 
 **Explanation:**
-*   **`__init__`**: This is the heart of the factory. When a `ServiceFactory` is created, it takes all the necessary configuration (from [Chapter 4: Configuration & Settings](04_configuration___settings_.md)) and then proceeds to *create* and *assemble* all the core services and repositories. Notice how `KeyframeQueryService` is created using the `_mongo_keyframe_repo` and `_milvus_keyframe_repo` that were *just created* by the factory. This shows the factory's role in orchestrating component creation and wiring them together.
-*   **`_init_milvus_repo` and `_init_model_service`**: These are helper methods that abstract away the details of connecting to Milvus or loading an AI model, keeping the `__init__` method cleaner.
-*   **`get_model_service()` and `get_keyframe_query_service()`**: These are simple methods that allow other parts of our application to *retrieve* the *already created and configured* instances of our services, rather than creating new ones.
 
-### 2. Application Lifespan (`app/core/lifespan.py`)
+*   **`app = FastAPI(..., lifespan=lifespan)`**: This line creates our main `FastAPI` application. We give it a `title`, `description`, and `version` which FastAPI uses to automatically generate interactive documentation (`/docs` endpoint). Crucially, `lifespan=lifespan` tells FastAPI to run our special `lifespan` function (which we'll look at next) during startup and shutdown.
+*   **`app.add_middleware(CORSMiddleware, ...)`**: This sets up our CORS "Host." By allowing `*` for `allow_origins`, we're saying "any website can talk to our API." In a real-world application, you would list the specific domain(s) of your frontend application(s) for better security.
+*   **`app.include_router(keyframe_api.router, prefix="/api/v1")`**: This is how we organize our API. Instead of stuffing all routes into `main.py`, we put related routes (like all keyframe-specific searches) into a separate Python file (`app/router/keyframe_api.py`). The `prefix="/api/v1"` means all routes defined in `keyframe_api.router` will automatically start with `/api/v1/`.
+*   **`app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")`**: This tells FastAPI to serve actual image files. If you have an `images` folder in your project, any file inside it (e.g., `images/L01/V005/123.webp`) can be accessed directly by a web browser at a URL like `http://localhost:8000/images/L01/V005/123.webp`. This is how our frontend can display the actual keyframe images!
 
-This is where our `ServiceFactory` is brought to life when the FastAPI application starts up.
+### Application Startup and Shutdown: `app/core/lifespan.py`
+
+Before our FastAPI application can effectively serve search requests, it needs to perform some vital setup tasks. It must connect to databases, initialize our Keyframe Data Model, and get our `ServiceFactory` ready. This "behind-the-scenes" preparation and cleanup are handled by a special `lifespan` function.
 
 ```python
 # File: app/core/lifespan.py (simplified)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient # For MongoDB
-from beanie import init_beanie # For our Keyframe model
+from beanie import init_beanie # For ORM
+from elasticsearch import AsyncElasticsearch # For Elasticsearch
 
-# ... other imports, including our settings and ServiceFactory ...
-from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings # Chapter 4
-from models.keyframe import Keyframe # Chapter 1
-from factory.factory import ServiceFactory # Our factory!
+from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings, ElasticsearchSettings
+from models.keyframe import Keyframe # Our Keyframe model from Chapter 1
+from factory.factory import ServiceFactory # Our Service Factory from Chapter 5
 
-mongo_client: AsyncIOMotorClient = None # Global variable for MongoDB client
-service_factory: ServiceFactory = None # Global variable for ServiceFactory
+# Global variables to hold our connections and factory
+mongo_client: AsyncIOMotorClient = None
+es_client: AsyncElasticsearch = None
+service_factory: ServiceFactory = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting up application...")
+    """
+    FastAPI lifespan context manager for startup and shutdown events.
+    This is like the "Kitchen Manager" preparing the kitchen.
+    """
+    print("Starting up application...")
     try:
-        # Load all our application settings (Chapter 4)
+        # 1. Load application settings (from Chapter 2)
         mongo_settings = MongoDBSettings()
         milvus_settings = KeyFrameIndexMilvusSetting()
+        es_settings = ElasticsearchSettings()
         app_settings = AppSettings()
         
-        # 1. Connect to MongoDB and initialize Beanie (as seen in Chapter 2)
+        # 2. Connect to MongoDB and initialize Beanie (our ORM)
         global mongo_client
-        mongo_client = AsyncIOMotorClient(
-            f"mongodb://{mongo_settings.MONGO_USER}:{mongo_settings.MONGO_PASSWORD}@{mongo_settings.MONGO_HOST}:{mongo_settings.MONGO_PORT}"
-        )
+        mongo_client = AsyncIOMotorClient(f"mongodb://{mongo_settings.MONGO_USER}:...")
         await mongo_client.admin.command('ping')
         await init_beanie(database=mongo_client[mongo_settings.MONGO_DB], document_models=[Keyframe])
-        logger.info("MongoDB and Beanie initialized.")
+        print("MongoDB and Beanie initialized.")
+
+        # 3. Connect to Elasticsearch
+        global es_client
+        es_client = AsyncElasticsearch(hosts=[{"host": es_settings.ES_HOST, ...}])
+        await es_client.ping()
+        print("Elasticsearch connected.")
         
-        # 2. IMPORTANT: Create our ServiceFactory!
+        # 4. Create our ServiceFactory (from Chapter 5)!
         global service_factory
         service_factory = ServiceFactory(
             milvus_collection_name=milvus_settings.COLLECTION_NAME,
             milvus_host=milvus_settings.HOST,
-            milvus_port=milvus_settings.PORT,
-            model_name=app_settings.MODEL_NAME,
-            mongo_collection=Keyframe,
-            milvus_search_params=milvus_settings.SEARCH_PARAMS # Example of passing settings
-            # ... pass other settings ...
+            model_checkpoint=r"path/to/model.pth", # Replace with actual path
+            es_client=es_client, es_ocr_index_name=es_settings.ES_OCR_INDEX,
+            app_settings=app_settings, # Pass necessary settings
+            mongo_collection=Keyframe # Pass our keyframe model
         )
-        logger.info("Service factory initialized.")
+        print("Service factory initialized.")
         
-        # 3. Store the factory (and mongo_client) in app.state for later access
+        # 5. Store the factory and clients in app.state for other parts of the app to use
         app.state.service_factory = service_factory
         app.state.mongo_client = mongo_client
+        app.state.es_client = es_client
         
-        logger.info("Application startup completed successfully.")
+        print("Application startup completed successfully.")
         
     except Exception as e:
-        logger.error(f"Failed to start application: {e}")
-        raise
+        print(f"ERROR: Failed to start application: {e}")
+        raise # Re-raise the exception to prevent the app from starting
+
+    yield # This is where the application starts running and handling requests
     
-    yield # Application runs here and handles requests
-    
-    logger.info("Shutting down application...")
-    # Clean up resources when the app stops
+    # --- Code below 'yield' runs during application shutdown ---
+    print("Shutting down application...")
     try:
-        if mongo_client:
-            mongo_client.close()
-            logger.info("MongoDB connection closed.")
-        logger.info("Application shutdown completed successfully.")
+        if mongo_client: mongo_client.close()
+        if es_client: await es_client.close()
+        print("Application shutdown completed successfully.")
     except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+        print(f"ERROR: Error during shutdown: {e}")
 ```
 
 **Explanation:**
-*   **`@asynccontextmanager def lifespan(app: FastAPI):`**: This special decorator tells FastAPI to run this function at startup and shutdown.
-*   **Inside `try` (before `yield`)**: This is the startup phase. Here, we load our [Configuration & Settings](04_configuration___settings_.md), connect to MongoDB, and then critically, we create our `ServiceFactory`.
-*   **`app.state.service_factory = service_factory`**: This line is key! We store the *single instance* of our `ServiceFactory` directly on the FastAPI `app` object. This makes it globally accessible to any part of our application that has access to the `request` object (which usually carries the `app` object).
-*   **`yield`**: This keyword signals that the startup tasks are complete, and the FastAPI application can now start handling incoming requests.
-*   **Inside `finally` (after `yield`)**: This is the shutdown phase. Here, we gracefully close resources like the MongoDB connection.
 
-### 3. Dependency Functions (`app/core/dependencies.py`)
+*   **`@asynccontextmanager def lifespan(app: FastAPI):`**: This special decorator tells FastAPI to run this `lifespan` function at the application's startup and shutdown.
+*   **Startup (`try` block before `yield`)**:
+    1.  **Load Settings**: It first loads all the necessary configuration settings (like database hosts and ports) using our `Pydantic Settings` from [Chapter 2: Configuration & Settings](02_configuration___settings__.md).
+    2.  **Connect to Databases**: It establishes connections to MongoDB (using `AsyncIOMotorClient`) and Elasticsearch, testing them with a `ping`.
+    3.  **Initialize Beanie**: It initializes `Beanie` (our Object-Relational Mapper for MongoDB), telling it about our `Keyframe` data model ([Chapter 1: Keyframe Data Model](01_keyframe_data_model__.md)) and which database to use.
+    4.  **Create `ServiceFactory`**: This is a crucial step! It creates a *single instance* of our `ServiceFactory` ([Chapter 5: Service Factory & Dependency Management](05_service_factory___dependency_management__.md)). This factory, in turn, creates and wires together *all* our repositories and search services (like `ModelService` and `KeyframeQueryService`).
+    5.  **Store in `app.state`**: The `service_factory`, `mongo_client`, and `es_client` are stored in `app.state`. This makes them easily accessible to any part of our application that needs them throughout its lifetime, ensuring we don't recreate expensive objects unnecessarily.
+*   **`yield`**: This keyword signals that all startup tasks are complete, and the FastAPI application can now start accepting and processing incoming web requests.
+*   **Shutdown (`try` block after `yield`)**: When the application is told to shut down, the code after `yield` is executed. This is where we gracefully close our database connections (`mongo_client.close()`, `es_client.close()`) to prevent resource leaks and ensure a clean exit.
 
-These functions are FastAPI's way of asking our `ServiceFactory` for the necessary tools and services.
+### Defining Our Keyframe Search Routes: `app/router/keyframe_api.py`
 
-```python
-# File: app/core/dependencies.py (simplified)
-from fastapi import Depends, Request, HTTPException
-from functools import lru_cache # For caching settings
-# ... other imports for QueryController, ModelService, KeyframeQueryService, ServiceFactory ...
-
-from factory.factory import ServiceFactory
-from controller.query_controller import QueryController # Chapter 3
-from service import ModelService, KeyframeQueryService # Chapter 5
-from core.settings import KeyFrameIndexMilvusSetting, AppSettings # Chapter 4
-
-@lru_cache() # Caches the result of this function after the first call
-def get_app_settings():
-    return AppSettings()
-
-def get_service_factory(request: Request) -> ServiceFactory:
-    """Retrieves the ServiceFactory from FastAPI's application state."""
-    service_factory = getattr(request.app.state, 'service_factory', None)
-    if service_factory is None:
-        raise HTTPException(status_code=503, detail="Service factory not initialized.")
-    return service_factory
-
-def get_model_service(
-    service_factory: ServiceFactory = Depends(get_service_factory)
-) -> ModelService:
-    """Retrieves the ModelService from the ServiceFactory."""
-    return service_factory.get_model_service()
-
-def get_keyframe_service(
-    service_factory: ServiceFactory = Depends(get_service_factory)
-) -> KeyframeQueryService:
-    """Retrieves the KeyframeQueryService from the ServiceFactory."""
-    return service_factory.get_keyframe_query_service()
-
-def get_query_controller(
-    model_service: ModelService = Depends(get_model_service), # Dependency on ModelService
-    keyframe_service: KeyframeQueryService = Depends(get_keyframe_service), # Dependency on KeyframeQueryService
-    app_settings: AppSettings = Depends(get_app_settings) # Dependency on settings
-) -> QueryController:
-    """
-    Creates and provides a QueryController instance,
-    injecting its required ModelService and KeyframeQueryService.
-    """
-    # Create the QueryController, passing in its required services
-    controller = QueryController(
-        data_folder=Path(app_settings.DATA_FOLDER),
-        id2index_path=Path(app_settings.ID2INDEX_PATH), # Example using settings
-        model_service=model_service,
-        keyframe_service=keyframe_service
-    )
-    return controller
-```
-
-**Explanation:**
-*   **`@lru_cache()`**: This is a Python decorator that "remembers" the result of a function call. For `get_app_settings()`, it means `AppSettings()` is only created *once*, and subsequent calls just return the cached instance, which is efficient for settings.
-*   **`get_service_factory(request: Request)`**: This function is the entry point to our factory. It takes the `request` object (which FastAPI automatically provides) and pulls our `service_factory` instance from `app.state` (where `lifespan` stored it).
-*   **`get_model_service(...)`**: This is a "dependency function" for `ModelService`. Notice `service_factory: ServiceFactory = Depends(get_service_factory)`. This tells FastAPI: "Before running `get_model_service`, please get me a `ServiceFactory` by calling `get_service_factory`." FastAPI intelligently resolves this chain! Once it has the factory, it calls `service_factory.get_model_service()` to retrieve the *already built* service.
-*   **`get_query_controller(...)`**: This is the most important dependency function for our search. It declares that it `Depends` on `get_model_service`, `get_keyframe_service`, and `get_app_settings`. FastAPI resolves all of these, gets the actual `ModelService`, `KeyframeQueryService`, and `AppSettings` objects, and *then* calls `get_query_controller`. Inside `get_query_controller`, we then create the `QueryController` ([Chapter 3: Query Controller](03_query_controller_.md)), *injecting* these pre-configured services into it.
-
-### 4. Injecting into API Routes (`app/router/keyframe_api.py`)
-
-Finally, our API routes simply declare that they need a `QueryController`, and FastAPI's dependency injection system does all the work!
+With our core application set up and initialized, the next step is to define the actual API endpoints (the "menu items") that clients can call. Our project groups related endpoints into "routers," which helps keep the code organized. All our keyframe search-related routes are defined in `app/router/keyframe_api.py`.
 
 ```python
-# File: app/router/keyframe_api.py (simplified)
-from fastapi import APIRouter, Depends
-# ... other imports ...
+# File: app/router/keyframe_api.py (simplified for a basic search route)
+from fastapi import APIRouter, Depends, Query
+from typing import List
 
-from controller.query_controller import QueryController # Our Query Controller
-from core.dependencies import get_query_controller # Our dependency function
+# Import our request/response models and the Query Controller
+from schema.request import TextSearchRequest # Describes incoming search query
+from schema.response import KeyframeDisplay, SingleKeyframeDisplay # Describes outgoing results
+from controller.query_controller import QueryController # Our search orchestrator from Chapter 6
+from core.dependencies import get_query_controller # How FastAPI gets the Query Controller
 
-router = APIRouter(...)
+# 1. Create an API router for keyframe-related endpoints
+router = APIRouter(
+    prefix="/keyframe", # All routes in this router will start with /keyframe
+    tags=["keyframe"],  # For API documentation grouping
+)
 
-@router.post("/search", ...)
+# 2. Define a POST endpoint for semantic text search
+@router.post(
+    "/search", # This endpoint will be accessible at /api/v1/keyframe/search
+    response_model=KeyframeDisplay, # FastAPI automatically validates outgoing data
+    summary="Simple Semantic Search",
+    description="Search keyframes using a natural language text query and semantic similarity."
+)
 async def search_keyframes(
-    # FastAPI sees this line and uses our dependency system!
-    controller: QueryController = Depends(get_query_controller) 
+    request: TextSearchRequest, # FastAPI automatically reads & validates the request body
+    controller: QueryController = Depends(get_query_controller), # FastAPI injects our controller!
 ):
     """
-    Search for keyframes using text query.
-    The QueryController is provided by our dependency management system.
+    Handles a semantic text search request for keyframes.
     """
-    # ... now the API route can simply use the 'controller' ...
-    results = await controller.search_text(query=..., top_k=...)
-    # ... format results and return ...
+    print(f"Received text search request for query: '{request.query}'")
+    
+    # 3. Delegate the actual search logic to the Query Controller
+    raw_results = await controller.search_text(
+        query=request.query,
+        top_k=request.top_k,
+        score_threshold=request.score_threshold,
+    )
+    
+    # 4. Format the raw results into displayable items with image URLs
+    display_results = [
+        SingleKeyframeDisplay(**controller.convert_to_display_result(result))
+        for result in raw_results
+    ]
+    
+    return KeyframeDisplay(results=display_results)
+
+# ... (other search routes like image-to-image, OCR, ASR are defined similarly) ...
 ```
 
 **Explanation:**
-*   **`controller: QueryController = Depends(get_query_controller)`**: This is the elegant conclusion! The `search_keyframes` function simply states, "I need an object of type `QueryController`, and you can get it by calling `get_query_controller`." FastAPI then orchestrates the entire process:
-    1.  Calls `get_query_controller`.
-    2.  `get_query_controller` calls `get_model_service` and `get_keyframe_service`.
-    3.  These in turn call `get_service_factory`.
-    4.  `get_service_factory` retrieves the `ServiceFactory` created by `lifespan`.
-    5.  The `ServiceFactory` hands over its *already created* `ModelService` and `KeyframeQueryService`.
-    6.  `get_query_controller` uses these to build and return a `QueryController`.
-    7.  FastAPI passes this ready-to-use `QueryController` to our `search_keyframes` function.
 
-This entire chain of dependencies happens automatically and efficiently, ensuring our API route gets exactly what it needs without worrying about how those components were built or configured.
+*   **`router = APIRouter(prefix="/keyframe", ...)`**: This creates a mini-FastAPI application specifically for keyframe-related routes. `prefix="/keyframe"` means that any route defined in this file (like `/search`) will automatically have `/keyframe` prepended to its path. (Combined with `main.py`'s `/api/v1` prefix, `/search` becomes `/api/v1/keyframe/search`.)
+*   **`@router.post("/search", ...)`**: This Python "decorator" tells FastAPI that the `search_keyframes` function below it should be executed when a `POST` request is sent to the `/keyframe/search` endpoint.
+    *   `response_model=KeyframeDisplay`: This is a powerful FastAPI feature. It tells FastAPI that the data returned by this function *must* conform to the `KeyframeDisplay` Pydantic model structure. FastAPI will automatically validate the outgoing data and generate accurate API documentation.
+*   **`request: TextSearchRequest`**: This tells FastAPI to expect the incoming request body (the data sent by the client) to be structured like our `TextSearchRequest` Pydantic model. FastAPI automatically parses the JSON body and validates it against this model, giving us strong type safety!
+*   **`controller: QueryController = Depends(get_query_controller)`**: This is FastAPI's elegant **dependency injection** in action! Instead of `search_keyframes` having to figure out how to create a `QueryController` itself, it simply declares: "I need a `QueryController`, and you can get it by calling `get_query_controller`." FastAPI handles the rest, ensuring that a fully configured `QueryController` (from our `ServiceFactory` as discussed in [Chapter 5: Service Factory & Dependency Management](05_service_factory___dependency_management__.md)) is provided to this function.
+*   **`raw_results = await controller.search_text(...)`**: This line shows the beauty of separation of concerns. The API route's job is to receive the request and send the response. It delegates the *actual search logic* to our `controller` (our "concierge" from [Chapter 6: Query Controller](06_query_controller_.md)), keeping the API code clean and focused.
+*   **`display_results = [...]`**: After getting the `raw_results` from the controller, the API route uses `controller.convert_to_display_result()` for each result. This method (from the Query Controller) is responsible for taking the raw database-level information and converting it into a user-friendly format, including generating the direct HTTP URL for the keyframe image that a web browser can display.
+
+### How a Search Request Flows Through Our Application
+
+Let's put all the pieces together and trace the entire journey of a simple text search request, from the user's browser to our backend and back.
+
+```mermaid
+sequenceDiagram
+    participant Client as User/Frontend App
+    participant FastAPI_App as FastAPI Application Core (app/main.py)
+    participant Keyframe_Router as Keyframe API Router (app/router/keyframe_api.py)
+    participant Query_Controller as Query Controller (Chapter 6)
+    participant Services_DBs as Internal Services & Databases (Ch 1,2,3,4,5)
+
+    Client->>FastAPI_App: POST /api/v1/keyframe/search (query="person walking", top_k=10)
+    Note over FastAPI_App: Checks CORS, logs request
+    FastAPI_App->>Keyframe_Router: Routes request to search_keyframes() function
+    Note over Keyframe_Router: FastAPI resolves dependencies for Query Controller
+    Keyframe_Router->>Query_Controller: search_text("person walking", top_k=10)
+    Query_Controller->>Services_DBs: Orchestrates embedding creation + DB search
+    Note over Services_DBs: Calls ModelService, KeyframeQueryService, Repositories for Milvus/MongoDB
+    Services_DBs-->>Query_Controller: Returns raw KeyframeServiceReponse
+    Query_Controller-->>Keyframe_Router: Returns list of raw KeyframeServiceReponse objects
+    Note over Keyframe_Router: Calls controller.convert_to_display_result for each result
+    Keyframe_Router-->>FastAPI_App: Returns KeyframeDisplay (formatted JSON with image URLs)
+    FastAPI_App-->>Client: Sends JSON response (validated by response_model)
+```
+
+1.  **Client Request**: A user or a frontend application sends a `POST` request to our FastAPI server at `http://localhost:8000/api/v1/keyframe/search`. The request body contains the search `query` (e.g., "person walking in park") and desired `top_k` results.
+2.  **FastAPI Application Core Receives**: The `FastAPI_App` (defined in `app/main.py`) receives this request. It first processes any middleware (like CORS) and then looks at the URL path to determine which specific API route should handle it.
+3.  **Route Matching**: The request is routed to the `search_keyframes` function within the `Keyframe_Router` (from `app/router/keyframe_api.py`).
+4.  **Dependency Injection**: Before `search_keyframes` can execute, FastAPI sees that it `Depends(get_query_controller)`. It then efficiently retrieves the *already initialized* `QueryController` instance (which was created by our `ServiceFactory` during application startup in `lifespan.py`).
+5.  **Controller Takes Over**: The `search_keyframes` function now has a fully prepared `controller` object and calls its `controller.search_text()` method, passing the user's query and parameters.
+6.  **Internal Search Logic**: The `Query_Controller` (our "concierge" from [Chapter 6: Query Controller](06_query_controller_.md)) takes over. It orchestrates the entire complex search process:
+    *   It asks the `ModelService` ([Chapter 4: Semantic Search Services](04_semantic_search_services__.md)) to convert the text query into a numerical vector embedding.
+    *   It then passes this embedding to the `KeyframeQueryService` ([Chapter 4: Semantic Search Services](04_semantic_search_services__.md)), which uses our `KeyframeVectorRepository` to search Milvus for similar vectors and our `KeyframeRepository` to fetch full metadata from MongoDB ([Chapter 3: Data Access Layer (Repositories)](03_data_access_layer__repositories__.md)).
+7.  **Raw Results Return**: The internal services return raw `KeyframeServiceReponse` objects back up to the `Query_Controller`.
+8.  **Query Controller Formats**: The `Query_Controller` returns these raw results to the `Keyframe_Router`. The router then uses `controller.convert_to_display_result()` to format each result into `SingleKeyframeDisplay` objects, which include the generated web-accessible image URLs.
+9.  **FastAPI Responds**: The `Keyframe_Router` finally passes the formatted `KeyframeDisplay` object back to the `FastAPI_App`, which serializes it into a JSON response and sends it back to the `Client`. The client can then use the image URLs to display the search results to the user.
 
 ### Conclusion
 
-In this chapter, we've brought together many concepts to understand how our `HCMAI2025_Baseline` project efficiently manages its components through **Service Factory & Dependency Management**. We learned that:
+In this final chapter, we've connected all the dots by exploring the **FastAPI Application Core**. We've learned that it acts as the primary interface for our `Image-Retrieval-System-for-AIC2025` project, handling incoming requests and sending out structured responses.
 
-*   The **`ServiceFactory`** acts as a central assembly line, responsible for creating and wiring together all the services and repositories our application needs (like the `ModelService`, `KeyframeQueryService`, and database repositories).
-*   FastAPI's **`lifespan`** function ensures that our `ServiceFactory` is initialized *once* when the application starts and stored for global access, and resources are cleaned up during shutdown.
-*   **Dependency management** (using FastAPI's `Depends` feature and our dependency functions) automatically injects these pre-configured services and controllers into our API routes, allowing each component to focus on its job without worrying about how its tools are acquired.
+We specifically covered:
+*   The role of `app/main.py` in initializing the core `FastAPI` application, setting up **CORS** for secure communication, and **mounting static files** to serve keyframe images directly.
+*   The critical function of `app/core/lifespan.py` in managing **application startup** (connecting to databases, initializing `Beanie`, creating the `ServiceFactory`) and **graceful shutdown** (closing connections).
+*   How `app/router/keyframe_api.py` defines specific **API endpoints** (routes) like `/api/v1/keyframe/search` and leverages FastAPI's powerful **dependency injection** to seamlessly obtain and use our `QueryController`.
+*   The complete journey of a search request, from the client's browser through the FastAPI core, router, Query Controller, and underlying services and databases, culminating in a formatted JSON response with clickable image URLs.
 
-This powerful combination makes our application highly modular, maintainable, testable, and efficient, ensuring that complex objects like database connections and AI models are set up correctly once and then easily accessed throughout the application.
+This robust FastAPI Application Core ensures that our intelligent `Image-Retrieval-System` is not just a collection of powerful components, but a fully functional, accessible, and high-performance web service ready to tackle the challenges of AIC2025!
