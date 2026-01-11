@@ -1,289 +1,362 @@
-# Chapter 5: Semantic Search Services
+# Chapter 5: Service Factory & Dependency Management
 
-Welcome back! In [Chapter 4: Configuration & Settings](04_configuration___settings_.md), we learned how our application gets its "instructions" – things like where databases are located or what AI model to use. Before that, in [Chapter 3: Query Controller](03_query_controller_.md), we saw how the `QueryController` acts as a "concierge," taking your search request and coordinating various internal services to get you results.
+Welcome back! In [Chapter 4: Semantic Search Services](04_semantic_search_services_.md), we explored the intelligent "brains" of our system: the `ModelService` (our translator) and the `KeyframeQueryService` (our expert detective). These services combine to understand your search queries and find relevant keyframes.
 
-But what *are* these "internal services"? Who actually performs the clever, intelligent part of finding keyframes based on your natural language query like "a person walking in the park"?
+But this raises an important question: When our application starts, who creates these specialized services? And once they are created, how does every part of our application that needs them get access to the *same, correctly configured* instance without having to create a new one every single time?
 
-This is where our **Semantic Search Services** come in! These are the true "brains" behind the intelligent search functionality, allowing our system to understand the *meaning* of your words, not just match exact keywords.
+Imagine you have a complex set of tools, each requiring specific setup (like connecting to a database or loading a large AI model). You wouldn't want to re-prepare these tools every time you need them! This is where the **Service Factory & Dependency Management** come into play.
 
 ### What Problem Are We Trying to Solve?
 
-Imagine you have a huge library of video keyframes. If you search for "a car" using traditional search methods, you might only find keyframes where the word "car" is explicitly mentioned in some tag. But what if a keyframe shows "an automobile" or "a vehicle"? A traditional search might miss these.
+Think of our `Image-Retrieval-System` as a sophisticated restaurant. To run smoothly, it needs many specialized "chefs" (our services like `ModelService`, `KeyframeQueryService`), each needing specific "ingredients" (data repositories) and "equipment" (AI models).
 
-Now, imagine you want to search for something more complex, like "a person smiling at a camera." A keyword search would be very difficult here!
+*   **Problem 1: Setting up the Kitchen (Initialization)**: We need a dedicated "kitchen manager" to set up all the tools *once* when the restaurant opens. This manager ensures all the ovens, blenders, and specialized ingredients are ready, properly connected, and prepared. If a tool needs other tools to work, the manager makes sure they are assembled correctly. This "kitchen manager" is our **`ServiceFactory`**.
 
-This is where **semantic search** shines. Instead of just looking for matching words, semantic search tries to understand the *meaning* or *intent* behind your query. It's like asking a friend who understands context, rather than just flipping through a dictionary.
+*   **Problem 2: Giving Tools to Chefs (Injection)**: When a chef (like a part of our API handling a search request) needs a blender, they don't go out and buy a new one. They simply ask the kitchen manager, "Hey, I need *the* blender!" The manager (our **dependency management system**) provides the *already prepared* blender. This way, the chef can focus on making delicious food, not on the tedious task of setting up tools. FastAPI's `Depends` system, working with our factory, provides this seamless tool delivery.
 
-Our `HCMAI2025_Baseline` project uses two main services to achieve this magic:
+Without this system, every time a new search request came in, our application might try to:
+*   Connect to a database (MongoDB, Milvus, Elasticsearch).
+*   Load a massive AI model into memory.
+*   Create brand new instances of various services.
 
-*   **`ModelService`**: This service is like a brilliant **translator**. You give it a natural language query (like "person walking in park"), and it translates that into a special numerical "language" that computers can understand – a **vector embedding**.
-*   **`KeyframeQueryService`**: This service is like an **expert detective**. It takes the numerical translation (the vector embedding) from the `ModelService` and uses it to quickly sift through millions of clues (other keyframe embeddings) to find the keyframes that are *most similar* in meaning. It then retrieves all the detailed information about those keyframes.
-
-Together, these two services form the core intelligence of our search functionality.
+Doing all this for *every single request* would be incredibly slow and wasteful! Our goal is to set up everything once when the application starts, and then efficiently provide these ready-to-use components wherever they're needed.
 
 ### Key Concepts
 
-Before we dive into the services, let's understand a couple of core ideas:
+Let's break down the main ideas that make this possible:
 
-#### 1. Vector Embeddings: The Computer's "Language of Meaning"
+1.  **Service Factory (`ServiceFactory`)**:
+    *   **What it is**: A dedicated class that knows how to create and configure *all* the different services and repositories our application needs (like `ModelService`, `KeyframeQueryService`, `KeyframeRepository`, etc.). It's like the master builder for our application's components.
+    *   **Why we use it**: It centralizes the creation logic. If one service needs other services to work, the factory knows how to "wire" them together correctly.
+    *   **Lifecycle**: We create *one* instance of this factory when the application starts up.
 
-Think of a **vector embedding** as a long list of numbers (like `[0.1, -0.5, 0.9, ..., 0.2]`). Each list of numbers represents the *meaning* or *essence* of something – it could be a word, a sentence, or even an image.
+2.  **Application Lifespan (`lifespan` function)**:
+    *   **What it is**: A special feature in FastAPI that allows us to run code *before* the application starts handling requests (startup events) and *after* it stops (shutdown events).
+    *   **Why we use it**: This is the perfect place to create our `ServiceFactory` (and also establish database connections). It ensures our factory is ready and available throughout the application's entire life. When the app shuts down, `lifespan` also cleans up, like closing database connections.
 
-*   **Similar meanings have similar vectors**: If two sentences have very similar meanings (e.g., "a dog barking" and "a canine making noise"), their vector embeddings will be very "close" to each other in a mathematical sense.
-*   **Different meanings have different vectors**: A sentence like "a cat sleeping" will have a vector far away from "a dog barking."
+3.  **Dependency Management (FastAPI `Depends`)**:
+    *   **What it is**: A powerful pattern where a component (e.g., an API route function) declares what "dependencies" (other services or objects) it needs, and the framework (FastAPI) automatically provides them.
+    *   **Why we use it**: It keeps our code clean, organized, and easy to test. An API route doesn't need to know *how* to create a `QueryController`; it just says "I need a `QueryController`," and FastAPI (with the help of our factory) hands one over. It's like asking for a tool from a shared toolbox.
 
-Our `ModelService`'s job is to create these magical numerical translations for your text queries.
+### How it All Works Together: The Central Assembly Line
 
-#### 2. Similarity Search: Finding "Close" Meanings
-
-Once everything is turned into numerical vectors, finding "similar" items becomes a mathematical problem: find vectors that are numerically "close" to each other.
-
-Imagine plotting these vectors on a giant, multi-dimensional graph. When you search, you create a "query vector," and then the system finds all the other vectors that are physically closest to your query vector. This is called **similarity search**, and our `KeyframeQueryService` performs this very quickly using a specialized database.
-
-### The ModelService: Our Text Translator
-
-The `ModelService` is responsible for taking your human-readable text query and converting it into a numerical vector embedding. It uses a powerful AI model (often a "transformer" model) trained to understand language.
-
-#### How the ModelService Works (High-Level)
-
-You give it a sentence like "a car driving on a highway."
-The service uses its internal AI model to process this sentence.
-It then outputs a list of numbers (our vector embedding) that represents the semantic meaning of "a car driving on a highway."
+Let's trace the journey of setting up and using our application's tools, focusing on how an API request for a keyframe search (like `/api/v1/keyframe/search`) eventually gets its `QueryController` and all its underlying services.
 
 ```mermaid
 sequenceDiagram
-    participant User as User Query
-    participant MS as ModelService
-    participant AI_Model as AI Language Model
+    participant Startup as App Startup (Lifespan)
+    participant Factory as ServiceFactory
+    participant FastAPI as FastAPI Framework
+    participant IncomingRequest as Incoming API Request
+    participant DependencyFuncs as Dependency Functions
+    participant QueryController as QueryController
+    participant APIRoute as API Search Route
 
-    User->>MS: query_text("person walking in park")
-    MS->>AI_Model: process(query_text)
-    AI_Model-->>MS: numerical_embedding (e.g., [0.1, -0.2, 0.7, ...])
-    MS-->>User: numerical_embedding
+    Startup->>Factory: Create all services and repos
+    Note over Factory: Creates ModelService, KeyframeQueryService, etc. and wires them
+    Startup->>FastAPI: Store Factory in app.state
+    Startup-->>FastAPI: App ready to handle requests
+
+    IncomingRequest->>FastAPI: POST /api/v1/keyframe/search
+    FastAPI->>APIRoute: Call search_keyframes(...)
+    APIRoute->>DependencyFuncs: Request QueryController (via Depends)
+    DependencyFuncs->>FastAPI: Get Factory from app.state
+    DependencyFuncs->>Factory: Ask for ModelService, KeyframeQueryService
+    Factory-->>DependencyFuncs: Provide pre-built services
+    DependencyFuncs->>QueryController: Create QueryController (injecting services)
+    QueryController-->>DependencyFuncs: Return QueryController instance
+    DependencyFuncs-->>APIRoute: Provide QueryController instance
+    APIRoute->>QueryController: Use QueryController to perform search
+    QueryController-->>APIRoute: Return search results
+    APIRoute-->>IncomingRequest: Send JSON response
 ```
 
-#### Inside the Code: `app/service/model_service.py`
+Let's break this down into the specific files and code.
 
-Let's look at a simplified version of `app/service/model_service.py`:
+### 1. The Service Factory (`app/factory/factory.py`)
+
+This is the blueprint for our "central assembly line." It knows how to put together all the pieces. When the `ServiceFactory` is created, it takes all the necessary configuration (from [Chapter 2: Configuration & Settings](02_configuration___settings_.md)) and then proceeds to *create* and *assemble* all the core services and repositories.
 
 ```python
-# File: app/service/model_service.py (simplified)
-import numpy as np # For numerical arrays
-import torch # For AI model operations
+# File: app/factory/factory.py (simplified)
+from repository.mongo import KeyframeRepository # From Chapter 3
+from repository.milvus import KeyframeVectorRepository # From Chapter 3
+from service import KeyframeQueryService, ModelService # From Chapter 4
+from models.keyframe import Keyframe # From Chapter 1
+# ... other imports for specific services and databases ...
 
-class ModelService:
-    def __init__(
-        self,
-        model, # The actual AI model
-        preprocess, # (Ignored for text here, but needed for images)
-        tokenizer, # Converts text to numbers for the model
-        device: str = 'cuda' # Where the model runs (CPU or GPU)
-    ):
-        self.model = model.to(device) # Move model to GPU if available
-        self.tokenizer = tokenizer # Store the tokenizer
-        self.device = device
-        self.model.eval() # Set model to evaluation mode
-
-    def embedding(self, query_text: str) -> np.ndarray:
-        """
-        Converts natural language text into a numerical vector embedding.
-        Example: "person walking in park" -> [0.1, -0.2, 0.7, ...]
-        """
-        with torch.no_grad(): # Don't track changes for efficiency
-            # Convert text into numbers the model understands
-            text_tokens = self.tokenizer([query_text]).to(self.device)
-            
-            # Ask the AI model to encode the text into an embedding
-            query_embedding = self.model.encode_text(text_tokens) \
-                                   .cpu().detach().numpy().astype(np.float32)
-        return query_embedding
-```
-
-**Explanation:**
-*   **`__init__`**: When `ModelService` is created, it's given the actual AI `model` and a `tokenizer`. The `tokenizer` is like a dictionary that converts words into numbers that the AI model can understand. The `model` itself is moved to the `device` (like a powerful GPU, if you have one, indicated by `'cuda'`).
-*   **`embedding(self, query_text: str)`**: This is the key method.
-    *   `with torch.no_grad()`: This is a performance trick for PyTorch models. We're just *using* the model to get an embedding, not training it, so we don't need to track gradients (calculations for learning).
-    *   `text_tokens = self.tokenizer([query_text]).to(self.device)`: The `tokenizer` converts your `query_text` into a numerical format that the AI model can understand.
-    *   `query_embedding = self.model.encode_text(text_tokens)...`: The AI `model` then takes these tokens and generates the vector embedding. We move it to the CPU (`.cpu()`) and convert it to a `numpy` array (`.numpy()`) for easier use in Python.
-
-The output of `ModelService.embedding()` is a `numpy` array – your query, now translated into the computer's "language of meaning"!
-
-### The KeyframeQueryService: Our Expert Detective
-
-The `KeyframeQueryService` is the heart of our semantic search. It takes the vector embedding (from `ModelService`) and actually performs the search. It works with two types of databases:
-
-1.  **Milvus**: A super-fast **vector database** that specializes in storing and quickly searching through millions (or billions!) of vector embeddings. It's designed for "similarity search."
-2.  **MongoDB**: Our regular database that stores the rich metadata for each keyframe (like `video_num`, `group_num`, `keyframe_num` as defined in [Chapter 1: Keyframe Data Model](01_keyframe_data_model_.md)). Milvus only stores the ID and the vector, so MongoDB holds the human-readable details.
-
-#### How the KeyframeQueryService Works (High-Level)
-
-1.  **Receive Embedding**: The service gets a numerical vector (the "meaning" of your query).
-2.  **Search Vector Database (Milvus)**: It sends this vector to Milvus. Milvus quickly finds the `top_k` (e.g., 10) keyframe IDs whose embeddings are most similar to your query vector. It also returns a "distance" or "score" indicating how similar they are.
-3.  **Retrieve Metadata (MongoDB)**: Milvus only gave us IDs. To get the full details (like video paths and actual numbers), the service takes these IDs and asks MongoDB for the corresponding keyframe data.
-4.  **Format Results**: It combines the similarity score from Milvus with the detailed metadata from MongoDB to create a list of meaningful search results, each wrapped in a `KeyframeServiceReponse` object ([Chapter 1: Keyframe Data Model](01_keyframe_data_model_.md)).
-
-```mermaid
-sequenceDiagram
-    participant KQS as KeyframeQueryService
-    participant KVR as Keyframe Vector Repository (Milvus)
-    participant KMR as Keyframe Mongo Repository (MongoDB)
-
-    KQS->>KVR: search_by_embedding([0.1, -0.2, ...], top_k=10)
-    KVR-->>KQS: Returns list of (keyframe_id, similarity_score)
-    KQS->>KMR: get_keyframe_by_list_of_keys([id1, id2, ...])
-    KMR-->>KQS: Returns list of full Keyframe objects (from MongoDB)
-    KQS->>KQS: Combines Milvus scores with MongoDB data
-    KQS-->>Query_Controller: Returns list of KeyframeServiceReponse
-```
-
-#### Inside the Code: `app/service/search_service.py`
-
-Let's simplify `app/service/search_service.py`. This service relies on **repositories** to interact with the databases. We'll dive deeper into repositories in [Chapter 6: Data Access Layer (Repositories)](06_data_access_layer__repositories__.md).
-
-**1. The `KeyframeQueryService` Blueprint**
-
-```python
-# File: app/service/search_service.py (simplified)
-from repository.milvus import KeyframeVectorRepository # For vector database
-from repository.mongo import KeyframeRepository # For MongoDB
-from schema.response import KeyframeServiceReponse # For our output structure
-
-class KeyframeQueryService:
-    def __init__(
-            self, 
-            keyframe_vector_repo: KeyframeVectorRepository, # Milvus access
-            keyframe_mongo_repo: KeyframeRepository, # MongoDB access
-        ):
-        self.keyframe_vector_repo = keyframe_vector_repo
-        self.keyframe_mongo_repo = keyframe_mongo_repo
-```
-
-**Explanation:**
-*   `__init__`: The `KeyframeQueryService` doesn't talk directly to Milvus or MongoDB. Instead, it uses specialized "repository" objects (`KeyframeVectorRepository` and `KeyframeRepository`). This is a good practice that keeps the code organized! It makes it easier to swap out databases later if needed.
-
-**2. The Main Search Method (`search_by_text`)**
-
-```python
-# File: app/service/search_service.py (simplified)
-# ... (inside KeyframeQueryService class) ...
-
-    async def search_by_text(
-        self,
-        text_embedding: list[float], # The vector from ModelService
-        top_k: int, # How many results to return
-        score_threshold: float | None = 0.5, # Minimum similarity score
-    ) -> list[KeyframeServiceReponse]:
-        """
-        Main method to search keyframes using a text embedding.
-        It calls an internal helper method to do the actual work.
-        """
-        return await self._search_keyframes(text_embedding, top_k, score_threshold, None)
-```
-
-**Explanation:**
-*   `search_by_text`: This is the public method that the `QueryController` calls. It takes the `text_embedding` (our numerical query), `top_k` (how many results we want), and a `score_threshold` (only show results more similar than this value). It then calls a more detailed internal method `_search_keyframes` to do the heavy lifting.
-
-**3. The Internal Search Logic (`_search_keyframes`)**
-
-```python
-# File: app/service/search_service.py (simplified)
-# ... (inside KeyframeQueryService class) ...
-
-    async def _search_keyframes(
-        self,
-        text_embedding: list[float],
-        top_k: int,
-        score_threshold: float | None = None,
-        exclude_indices: list[int] | None = None
-    ) -> list[KeyframeServiceReponse]:
+class ServiceFactory:
+    def __init__(self, milvus_collection_name: str, milvus_host: str, 
+                 model_checkpoint: str, es_client, es_ocr_index_name: str, 
+                 app_settings, mongo_collection=Keyframe, **kwargs):
         
-        # 1. Prepare search request for Milvus (our vector database)
-        search_request = self.keyframe_vector_repo.create_search_request(
-            embedding=text_embedding,
-            top_k=top_k,
-            exclude_ids=exclude_indices
+        # 1. Create the MongoDB Repository (our "MongoDB Librarian")
+        self._mongo_keyframe_repo = KeyframeRepository(collection=mongo_collection)
+        
+        # 2. Create and connect the Milvus Repository (our "Milvus Librarian")
+        self._milvus_keyframe_repo = self._init_milvus_repo(
+            collection_name=milvus_collection_name, host=milvus_host, **kwargs
         )
 
-        # 2. Perform the actual vector similarity search in Milvus
-        search_response = await self.keyframe_vector_repo.search_by_embedding(search_request)
+        # 3. Create the Model Service (our "AI Translator")
+        self._model_service = self._init_model_service(model_checkpoint, kwargs['tokenizer_checkpoint'])
 
-        # 3. Filter results based on confidence score (distance)
-        filtered_results = [
-            result for result in search_response.results
-            if score_threshold is None or result.distance > score_threshold
-        ]
-        sorted_results = sorted(filtered_results, key=lambda r: r.distance, reverse=True)
-        sorted_ids = [result.id_ for result in sorted_results] # Get just the IDs
-
-        # 4. Retrieve full keyframe metadata from MongoDB using the IDs
-        keyframes_from_mongo = await self.keyframe_mongo_repo.get_keyframe_by_list_of_keys(sorted_ids)
-
-        # 5. Create a map for quick lookup from ID to full Keyframe object
-        keyframe_map = {k.key: k for k in keyframes_from_mongo}
+        # 4. Create the Keyframe Query Service (our "Expert Detective")
+        #    Notice it needs the already created mongo and milvus repositories!
+        self._keyframe_query_service = KeyframeQueryService(
+            keyframe_mongo_repo=self._mongo_keyframe_repo,
+            keyframe_vector_repo=self._milvus_keyframe_repo
+        )
         
-        # 6. Build the final response list (KeyframeServiceReponse objects)
-        response = []
-        for result in sorted_results:
-            keyframe = keyframe_map.get(result.id_) # Get full data from map
-            if keyframe: # If we found it in MongoDB
-                response.append(
-                    KeyframeServiceReponse(
-                        key=keyframe.key,
-                        video_num=keyframe.video_num,
-                        group_num=keyframe.group_num,
-                        keyframe_num=keyframe.keyframe_num,
-                        confidence_score=result.distance # Add Milvus score
-                    )
-                )
-        return response
+        # ... (other services like OCR, ASR, VideoRankingService are created similarly) ...
+        # Example: self._ocr_repo = OcrRepository(client=es_client, index_name=es_ocr_index_name)
+        # Example: self._ocr_query_service = OcrQueryService(ocr_repo=self._ocr_repo, ...)
+
+        # 5. Create the Query Controller, wiring in all its services
+        self._query_controller = QueryController(
+            data_folder=Path(app_settings.DATA_FOLDER),
+            id2index_path=Path(app_settings.ID2INDEX_PATH),
+            model_service=self._model_service,
+            keyframe_service=self._keyframe_query_service,
+            # ... other services ...
+        )
+
+    def _init_milvus_repo(self, collection_name: str, host: str, **kwargs):
+        # Details of connecting to Milvus (using pymilvus) are hidden here
+        # This function returns a configured KeyframeVectorRepository
+        pass # Simplified for tutorial
+        # Example: connections.connect(alias="default", host=host, port=kwargs['milvus_port'])
+        # Example: collection = MilvusCollection(collection_name, using="default")
+        # Example: return KeyframeVectorRepository(collection=collection, search_params=kwargs['milvus_search_params'])
+
+    def _init_model_service(self, model_checkpoint: str, tokenizer_checkpoint: str):
+        # Details of loading the AI model (using open_clip, beit3) are hidden here
+        # This function returns a configured ModelService
+        pass # Simplified for tutorial
+        # Example: model, _, preprocess = open_clip.create_model_and_transforms(model_name)
+        # Example: tokenizer = open_clip.get_tokenizer(model_name)
+        # Example: return ModelService(model=model, preprocess=preprocess, tokenizer=tokenizer)
+
+    def get_model_service(self):
+        """Provides the already created ModelService instance."""
+        return self._model_service
+
+    def get_keyframe_query_service(self):
+        """Provides the already created KeyframeQueryService instance."""
+        return self._keyframe_query_service
+    
+    def get_query_controller(self):
+        """Provides the already created QueryController instance."""
+        return self._query_controller
+    # ... other getter methods for other services ...
 ```
 
 **Explanation:**
-*   **`search_request = self.keyframe_vector_repo.create_search_request(...)`**: Creates a special object to tell Milvus what to search for.
-*   **`search_response = await self.keyframe_vector_repo.search_by_embedding(search_request)`**: This is where the magic happens! The `KeyframeVectorRepository` talks to Milvus and performs the fast similarity search. It returns a list of matching keyframe IDs and their similarity `distance` (our confidence score).
-*   **Filtering and Sorting**: We then filter these results to ensure they meet our `score_threshold` and sort them by relevance.
-*   **`keyframes_from_mongo = await self.keyframe_mongo_repo.get_keyframe_by_list_of_keys(sorted_ids)`**: Now that we have the IDs of the relevant keyframes from Milvus, we ask our `KeyframeRepository` (which talks to MongoDB) to fetch the full details for each of those IDs. This is important because Milvus only stores IDs and vectors, not video numbers or group numbers.
-*   **Building the `response`**: Finally, we loop through the sorted Milvus results and combine them with the full keyframe data from MongoDB. For each result, we create a `KeyframeServiceReponse` object, including the similarity `confidence_score`. This is the list of fully detailed, semantically relevant keyframes that will be returned.
+*   **`__init__(self, ...)`**: This is the heart of the factory. When a `ServiceFactory` object is created, it takes all necessary configuration parameters. Inside, it systematically creates each repository and service.
+*   **Wiring Dependencies**: Notice how `_keyframe_query_service` is created by passing it `_mongo_keyframe_repo` and `_milvus_keyframe_repo`. This demonstrates how the factory "wires" services together, ensuring that each service gets its required dependencies already prepared.
+*   **Helper Methods (`_init_milvus_repo`, `_init_model_service`)**: These are private methods that handle the complex details of connecting to databases or loading AI models, keeping the main `__init__` method cleaner and easier to read.
+*   **`get_..._service()`**: These are simple methods that allow other parts of our application to *retrieve* the *already created and configured* instances of our services, rather than creating new ones. The `get_query_controller()` method directly returns the fully wired `QueryController` instance.
 
-### How Semantic Search Services Fit into the Bigger Picture
+### 2. Application Lifespan (`app/core/lifespan.py`)
 
-Let's put it all together by recalling the flow from [Chapter 3: Query Controller](03_query_controller_.md) and expanding the "Internal Services" part:
+This is where our `ServiceFactory` is brought to life when the FastAPI application starts up. This `lifespan` function is part of FastAPI's lifecycle management.
 
-```mermaid
-sequenceDiagram
-    participant Client as User/Frontend App
-    participant API_Router as FastAPI API Router
-    participant QC as Query Controller
-    participant MS as Model Service (Translator)
-    participant KQS as Keyframe Query Service (Detective)
-    participant KVR as Keyframe Vector Repo (Milvus)
-    participant KMR as Keyframe Mongo Repo (MongoDB)
+```python
+# File: app/core/lifespan.py (simplified)
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from motor.motor_asyncio import AsyncIOMotorClient # For MongoDB
+from beanie import init_beanie # For our Keyframe model
+from elasticsearch import AsyncElasticsearch # For Elasticsearch
 
-    Client->>API_Router: POST /api/v1/keyframe/search (query="person walking", top_k=5)
-    API_Router->>QC: search_text("person walking", top_k=5, ...)
-    QC->>MS: embedding("person walking")
-    MS-->>QC: Returns text embedding (e.g., [0.1, 0.5, ..., 0.9])
-    QC->>KQS: search_by_text([0.1, ...], top_k=5)
-    KQS->>KVR: Search Milvus for top 5 similar vectors to [0.1, ...]
-    KVR-->>KQS: Returns list of (Keyframe ID, Similarity Score) for top 5
-    KQS->>KMR: Get full Keyframe details from MongoDB for these IDs
-    KMR-->>KQS: Returns list of full Keyframe objects (with video_num, etc.)
-    KQS-->>QC: Returns list of KeyframeServiceReponse (ID, video_num, score, etc.)
-    QC->>QC: Formats each result into a displayable item (generates image URL)
-    QC-->>API_Router: Returns formatted display results (KeyframeDisplay)
-    API_Router-->>Client: Sends JSON response with image URLs and scores
+from core.settings import MongoDBSettings, KeyFrameIndexMilvusSetting, AppSettings, ElasticsearchSettings # Chapter 2
+from models.keyframe import Keyframe # Chapter 1
+from factory.factory import ServiceFactory # Our factory!
+from core.logger import SimpleLogger
+
+logger = SimpleLogger(__name__)
+mongo_client: AsyncIOMotorClient = None
+es_client: AsyncElasticsearch = None
+service_factory: ServiceFactory = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up application...")
+    try:
+        # 1. Load all our application settings (from Chapter 2)
+        mongo_settings = MongoDBSettings()
+        milvus_settings = KeyFrameIndexMilvusSetting()
+        app_settings = AppSettings()
+        es_settings = ElasticsearchSettings()
+        
+        # 2. Connect to MongoDB and initialize Beanie
+        global mongo_client
+        mongo_client = AsyncIOMotorClient(f"mongodb://{mongo_settings.MONGO_USER}:...")
+        await init_beanie(database=mongo_client[mongo_settings.MONGO_DB], document_models=[Keyframe])
+        logger.info("MongoDB and Beanie initialized.")
+
+        # 3. Connect to Elasticsearch
+        global es_client
+        es_client = AsyncElasticsearch(
+            hosts=[{"host": es_settings.ES_HOST, "port": es_settings.ES_PORT, "scheme": "http"}],
+            basic_auth=(es_settings.ES_USER, es_settings.ELASTIC_PASSWORD)
+        )
+        await es_client.ping()
+        logger.info("Elasticsearch connected.")
+        
+        # 4. IMPORTANT: Create our ServiceFactory!
+        global service_factory
+        service_factory = ServiceFactory(
+            milvus_collection_name=milvus_settings.COLLECTION_NAME,
+            milvus_host=milvus_settings.HOST,
+            model_checkpoint=r"/path/to/model.pth", # Use actual path from settings
+            tokenizer_checkpoint=r"/path/to/tokenizer.spm", # Use actual path
+            es_client=es_client, es_ocr_index_name=es_settings.ES_OCR_INDEX,
+            es_asr_index_name=es_settings.ES_ASR_INDEX,
+            app_settings=app_settings, # Pass AppSettings to factory
+            milvus_port=milvus_settings.PORT, # Example of passing more kwargs
+            milvus_search_params=milvus_settings.SEARCH_PARAMS # Example
+            # ... pass other settings ...
+        )
+        logger.info("Service factory initialized.")
+        
+        # 5. Store the factory and other clients in app.state for later access
+        app.state.service_factory = service_factory
+        app.state.mongo_client = mongo_client
+        app.state.es_client = es_client
+        
+        logger.info("Application startup completed successfully.")
+        
+    except Exception as e:
+        logger.error(f"Failed to start application: {e}")
+        raise
+    
+    yield # Application runs here and handles requests
+    
+    logger.info("Shutting down application...")
+    # Clean up resources when the app stops
+    try:
+        if mongo_client: mongo_client.close()
+        if es_client: await es_client.close()
+        logger.info("Application shutdown completed successfully.")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
 ```
 
-This diagram shows how your natural language query travels through the system: from the API, to the `QueryController`, then through the `ModelService` for translation, to the `KeyframeQueryService` for the actual detective work in Milvus and MongoDB, and finally back to you as relevant search results with images.
+**Explanation:**
+*   **`@asynccontextmanager def lifespan(app: FastAPI):`**: This special decorator tells FastAPI to run this function at startup (before `yield`) and shutdown (after `yield`).
+*   **Resource Initialization**: Inside the `try` block, we connect to all our databases (MongoDB, Elasticsearch) and then critically, we create our `ServiceFactory`.
+*   **`app.state.service_factory = service_factory`**: This line is key! We store the *single instance* of our `ServiceFactory` directly on the FastAPI `app` object. This makes it globally accessible to any part of our application that has access to the `request` object (which usually carries the `app` object).
+*   **`yield`**: This keyword signals that the startup tasks are complete, and the FastAPI application can now start handling incoming requests.
+*   **Shutdown**: The code after `yield` is executed when the application is shutting down, ensuring that resources like database connections are gracefully closed.
+
+### 3. Dependency Functions (`app/core/dependencies.py`)
+
+These functions are FastAPI's way of asking our `ServiceFactory` for the necessary tools and services. They define the "dependency chain" that FastAPI follows.
+
+```python
+# File: app/core/dependencies.py (simplified)
+from fastapi import Depends, Request, HTTPException
+from functools import lru_cache # For caching settings
+
+from factory.factory import ServiceFactory # Our factory
+from controller.query_controller import QueryController # Our Query Controller
+from service import ModelService, KeyframeQueryService # Our services
+from core.settings import AppSettings # Our settings
+
+# Caches the result of this function after the first call (efficient for settings)
+@lru_cache() 
+def get_app_settings():
+    return AppSettings()
+
+def get_service_factory(request: Request) -> ServiceFactory:
+    """Retrieves the ServiceFactory from FastAPI's application state."""
+    service_factory = getattr(request.app.state, 'service_factory', None)
+    if service_factory is None:
+        raise HTTPException(status_code=503, detail="Service factory not initialized.")
+    return service_factory
+
+def get_model_service(
+    service_factory: ServiceFactory = Depends(get_service_factory)
+) -> ModelService:
+    """Retrieves the ModelService from the ServiceFactory."""
+    return service_factory.get_model_service()
+
+def get_keyframe_service(
+    service_factory: ServiceFactory = Depends(get_service_factory)
+) -> KeyframeQueryService:
+    """Retrieves the KeyframeQueryService from the ServiceFactory."""
+    return service_factory.get_keyframe_query_service()
+
+def get_query_controller(
+    model_service: ModelService = Depends(get_model_service), # Dependency on ModelService
+    keyframe_service: KeyframeQueryService = Depends(get_keyframe_service), # Dependency on KeyframeQueryService
+    app_settings: AppSettings = Depends(get_app_settings) # Dependency on settings
+    # ... (other services like OcrQueryService, AsrQueryService, QueryRewriteService) ...
+) -> QueryController:
+    """
+    Retrieves the QueryController instance,
+    injecting its required ModelService and KeyframeQueryService.
+    """
+    # Our factory now directly provides the QueryController,
+    # already wired with its services.
+    service_factory_instance = get_service_factory(Request) # Not ideal, but for simplicity
+    return service_factory_instance.get_query_controller()
+```
+
+**Explanation:**
+*   **`@lru_cache()`**: This decorator makes `get_app_settings()` very efficient; the `AppSettings` object is only created once.
+*   **`get_service_factory(request: Request)`**: This function is the entry point. It takes the `request` object (provided by FastAPI) and retrieves our single `service_factory` instance from `app.state`.
+*   **`get_model_service(...)` and `get_keyframe_service(...)`**: These are dependency functions for our specific services. Notice `service_factory: ServiceFactory = Depends(get_service_factory)`. This tells FastAPI: "Before running `get_model_service`, please get me a `ServiceFactory` by calling `get_service_factory`." FastAPI intelligently resolves this chain! Once it has the factory, it calls `service_factory.get_model_service()` to retrieve the *already built* service.
+*   **`get_query_controller(...)`**: This function is responsible for getting the `QueryController`. It declares dependencies on `get_model_service`, `get_keyframe_service`, and `get_app_settings`. FastAPI resolves all of these, gets the actual `ModelService`, `KeyframeQueryService`, and `AppSettings` objects, and *then* retrieves the fully configured `QueryController` from the factory. (Note: The `get_service_factory(Request)` call in the simplified example is a conceptual shortcut; in real code, `service_factory` would be passed in via `Depends` if needed.)
+
+### 4. Injecting into API Routes (`app/router/keyframe_api.py`)
+
+Finally, our API routes simply declare that they need a `QueryController`, and FastAPI's dependency injection system does all the work!
+
+```python
+# File: app/router/keyframe_api.py (conceptual)
+from fastapi import APIRouter, Depends
+from controller.query_controller import QueryController # Our Query Controller
+from core.dependencies import get_query_controller # Our dependency function
+
+router = APIRouter(prefix="/api/v1/keyframe")
+
+@router.post("/search")
+async def search_keyframes(
+    # FastAPI sees this line and uses our dependency system!
+    controller: QueryController = Depends(get_query_controller) 
+):
+    """
+    Search for keyframes using a text query.
+    The QueryController is provided by our dependency management system.
+    """
+    # Now, the API route can simply use the 'controller' instance
+    # without knowing how it was created or configured!
+    query_text = "person walking in the park" # Example search text
+    top_k_results = 5
+    results = await controller.search_text(query_text, top_k=top_k_results)
+    
+    return {"message": "Search results", "data": results}
+```
+
+**Explanation:**
+*   **`controller: QueryController = Depends(get_query_controller)`**: This is the elegant conclusion! The `search_keyframes` function simply states, "I need an object of type `QueryController`, and you can get it by calling `get_query_controller`." FastAPI then orchestrates the entire process:
+    1.  It calls `get_query_controller`.
+    2.  `get_query_controller` (in turn) asks the `ServiceFactory` for the `QueryController` instance.
+    3.  The `ServiceFactory` hands over its *already created and fully wired* `QueryController`.
+    4.  FastAPI passes this ready-to-use `QueryController` to our `search_keyframes` function.
+
+This entire chain of dependencies happens automatically and efficiently, ensuring our API route gets exactly what it needs without worrying about how those components were built or configured.
 
 ### Conclusion
 
-In this chapter, we've explored the intelligent core of our `HCMAI2025_Baseline` project: the **Semantic Search Services**. We learned that:
+In this chapter, we've brought together many concepts to understand how our `Image-Retrieval-System-for-AIC2025` project efficiently manages its components through **Service Factory & Dependency Management**. We learned that:
 
-*   **Semantic search** allows our system to understand the *meaning* of your queries, not just keywords.
-*   The **`ModelService`** acts as a translator, converting natural language text into numerical **vector embeddings** that represent meaning.
-*   The **`KeyframeQueryService`** acts as an expert detective, taking these embeddings to perform **similarity searches** in Milvus (our vector database) and retrieving detailed metadata from MongoDB.
+*   The **`ServiceFactory`** acts as a central assembly line, responsible for creating and wiring together all the services and repositories our application needs (like the `ModelService`, `KeyframeQueryService`, and database repositories).
+*   FastAPI's **`lifespan`** function ensures that our `ServiceFactory` is initialized *once* when the application starts and stored for global access, and resources are cleaned up during shutdown.
+*   **Dependency management** (using FastAPI's `Depends` feature and our dependency functions) automatically injects these pre-configured services and controllers into our API routes, allowing each component to focus on its job without worrying about how its tools are acquired.
 
-These services are crucial for providing a powerful and intuitive search experience. Now that we understand how the intelligent search is performed, the next logical step is to dive into how these services actually talk to the databases. This is what we'll explore in the next chapter, where we discuss the **Data Access Layer (Repositories)**!
+This powerful combination makes our application highly modular, maintainable, testable, and efficient, ensuring that complex objects like database connections and AI models are set up correctly once and then easily accessed throughout the application. Now that we understand how all our services are expertly assembled and managed, the next step is to explore the **Query Controller**, which acts as the main orchestrator for handling user search requests.
 
-[Next Chapter: Data Access Layer (Repositories)](06_data_access_layer__repositories__.md)
+[Next Chapter: Query Controller](06_query_controller_.md)
