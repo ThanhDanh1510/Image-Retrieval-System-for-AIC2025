@@ -1,61 +1,55 @@
-# Tutorial: HCMAI2025_Baseline
+# Tutorial: Image-Retrieval-System-for-AIC2025
 
-This project provides a **Keyframe Search API** designed to help users efficiently find specific *video keyframes*.
-By inputting natural language queries, the system leverages advanced *semantic search* techniques
-to understand the intent and retrieve the most relevant keyframes from a large dataset,
-offering flexible filtering options by video groups or individual videos.
+This project is an **Image Retrieval System** designed for AIC2025, enabling *intelligent search* for keyframes (important images) extracted from videos. It processes natural language queries or uploaded images to find relevant video moments by understanding their *meaning*, not just keywords. The system efficiently stores, searches, and presents these keyframes, including generating direct image URLs, making complex video content discoverable.
 
 
-**Source Repository:** [None](None)
+## Visual Overview
 
 ```mermaid
 flowchart TD
-    A0["FastAPI Application Core
+    A0["Keyframe Data Model
 "]
-    A1["Configuration & Settings
+    A1["FastAPI Application Core
 "]
-    A2["Keyframe Data Model
+    A2["Configuration & Settings
 "]
-    A3["Data Access Layer (Repositories)
+    A3["Service Factory & Dependency Management
 "]
-    A4["Semantic Search Services
+    A4["Query Controller
 "]
-    A5["Service Factory & Dependency Management
+    A5["Semantic Search Services
 "]
-    A6["Query Controller
+    A6["Data Access Layer (Repositories)
 "]
-    A0 -- "Uses Lifespan" --> A5
-    A0 -- "Registers API Routes" --> A6
-    A0 -- "Accesses Configuration" --> A1
-    A1 -- "Provides Settings" --> A5
-    A1 -- "Informs Controller Paths" --> A6
-    A1 -- "Configures Services" --> A4
-    A2 -- "Defines Structure" --> A3
-    A2 -- "Structures Service Output" --> A4
-    A2 -- "Formats API Responses" --> A6
-    A2 -- "Registered by Lifespan" --> A5
-    A3 -- "Provides Data Access" --> A4
-    A3 -- "Managed by Factory" --> A5
-    A4 -- "Utilizes Repositories" --> A3
-    A4 -- "Executes Search Logic" --> A6
-    A4 -- "Instantiated by Factory" --> A5
-    A5 -- "Provides Controller" --> A6
-    A6 -- "Handles API Requests" --> A0
+    A1 -- "Initializes" --> A3
+    A1 -- "Routes to" --> A4
+    A2 -- "Configures" --> A3
+    A2 -- "Provides URLs to" --> A4
+    A3 -- "Creates" --> A5
+    A3 -- "Creates" --> A6
+    A3 -- "Provides instance to" --> A4
+    A4 -- "Orchestrates" --> A5
+    A4 -- "Formats for display" --> A0
+    A5 -- "Accesses data via" --> A6
+    A5 -- "Returns as response" --> A0
+    A6 -- "Stores/Retrieves" --> A0
 ```
 
 ## Chapters
 
 1. [Keyframe Data Model
 ](01_keyframe_data_model_.md)
-2. [FastAPI Application Core
-](02_fastapi_application_core_.md)
-3. [Query Controller
-](03_query_controller_.md)
-4. [Configuration & Settings
-](04_configuration___settings_.md)
-5. [Semantic Search Services
-](05_semantic_search_services_.md)
-6. [Data Access Layer (Repositories)
-](06_data_access_layer__repositories__.md)
-7. [Service Factory & Dependency Management
-](07_service_factory___dependency_management_.md)
+2. [Configuration & Settings
+](02_configuration___settings_.md)
+3. [Data Access Layer (Repositories)
+](03_data_access_layer__repositories__.md)
+4. [Semantic Search Services
+](04_semantic_search_services_.md)
+5. [Service Factory & Dependency Management
+](05_service_factory___dependency_management_.md)
+6. [Query Controller
+](06_query_controller_.md)
+7. [FastAPI Application Core
+](07_fastapi_application_core_.md)
+
+---
